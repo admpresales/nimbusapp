@@ -1,0 +1,162 @@
+#!/bin/bash
+
+IMAGE_FILE="env"
+
+function usage()
+{
+   echo "Usage:"
+   echo -e "\t./nimbusapp [product_name|-i <image>] [-s|--set <ARG=value>] up|down|start|stop"
+   echo -e "\t\tproduct_name - is software product name"
+   echo -e "\t\t-h --help"
+   echo -e "\t\t-i - use a specific image to run. Short name (assumes admpresales)"
+   echo -e "\t\t\texample: pass ${PRODUCT}:x.x.x only out of admpresales/${PRODUCT}:x.x.x"
+   echo -e "\t\t-s | --set - enables you to set(override) default arguments"
+   echo -e "\t\t-p - docker-compose project name to use"
+   echo -e "\t\tup - starts up a container (pulls down image if not present)"
+   echo -e "\t\tdown - stops AND TERMINATES (removes) the container(s)"
+   echo -e "\t\tstart - starts existing container(s)"
+   echo -e "\t\tstop - stops existing container(s)"
+   echo ""
+}
+
+function multiple_actions(){
+   echo "You can only perform one action.  Current action is '${ACTION}' and you attempting to add '$1'"
+   echo "Aborting"
+   usage;
+   exit 1;
+}
+
+function product_exists(){
+   #if we find an entry, return 0 for success, else 1 for failure
+   if [[ `grep "^$1.dockerapp " ${IMAGE_FILE}| wc -l` -eq 1 ]]
+   then
+      echo 0
+   else
+      echo 1
+   fi
+}
+
+PRODUCT=""
+PROJECT_NAME=""
+ACTION=""
+ACTION_COUNT=0
+
+if [[ $(product_exists $1) -eq 1 ]]
+then
+   echo "Could not find that product."
+   usage
+   exit 1
+else
+   if [[ `echo "$@"|grep -o "\-i"|wc -l` -ge 1 ]]
+   then
+      echo "You must only pass a product name OR a specified image (-i).  NOT both."
+      usage
+      if [[ `echo "$@"|grep -o "\-i"|wc -l` -gt 1 ]]
+      then
+         echo "Only one (single) image is allowed to be passed"
+      fi
+      exit 1
+   fi
+   PRODUCT=$1.dockerapp
+   shift
+fi
+
+while [[ "$1" != "" ]]; do
+   PARAM=$1
+   VALUE=$2
+   case $PARAM in
+      -h | --help)
+         usage
+         exit
+         ;;
+      -i)
+         IMAGE="admpresales/$2"
+         shift
+         shift
+         ;;
+      -s)
+         ARGS="${ARGS} $1 $2"
+         shift
+         shift
+         ;;
+      -p)
+         PROJECT_NAME=$2
+         shift
+         shift
+         ;;
+      up)
+         #If ACTION has already been set
+         if [[ ${ACTION_COUNT} -gt 0 ]]; then
+            multiple_actions
+         else
+            ACTION_COUNT=1
+            ACTION="up -d"
+            shift
+         fi
+         ;;
+      down)
+         #If ACTION has already been set
+         if [[ ${ACTION_COUNT} -gt 0 ]]; then
+            multiple_actions
+         else
+            ACTION_COUNT=1
+            ACTION="down"
+            shift
+         fi
+         ;;
+      start)
+         #If ACTION has already been set
+         if [[ ${ACTION_COUNT} -gt 0 ]]; then
+            multiple_actions
+         else
+            ACTION_COUNT=1
+            ACTION="start"
+            shift
+         fi
+         ;;
+      stop)
+         #If ACTION has already been set
+         if [[ ${ACTION_COUNT} -gt 0 ]]; then
+            multiple_actions
+         else
+            ACTION_COUNT=1
+            ACTION="stop"
+            shift
+         fi
+         ;;
+      *)
+         echo "Invalid agument passed: $1"
+         echo "Aborting"
+         usage
+         exit 1
+   esac
+done
+
+if [[ -z ${ACTION} ]]
+then
+   echo "You must specify an action up|down|start|stop"
+   usage
+   exit 1
+fi
+
+if [[ -z ${IMAGE} ]]
+then
+   if [ `grep "^${PRODUCT} " ${IMAGE_FILE}| wc -l` -eq 1 ]
+   then
+      IMAGE=`grep "^${PRODUCT} " ${IMAGE_FILE}|awk '{print $2}'`
+   else
+      echo "Your env file contains multiple entires for ${PRODUCT}"
+      exit 1
+   fi
+fi
+
+#create a project name for the docker-compose based on the image name.
+if [[ -z ${PROJECT_NAME} ]]
+then
+   PROJECT_NAME=`echo ${IMAGE}|sed -r 's|\w+/||'|sed 's/:/_/'`
+fi
+
+echo -e "Starting ${PRODUCT} using: \n\t${IMAGE}"
+echo -e "\tUsing docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT_NAME} -f - ${ACTION}"
+docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT_NAME} -f - ${ACTION}
+
