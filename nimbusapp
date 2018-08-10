@@ -193,7 +193,7 @@ if [[ -z ${PROJECT_NAME} ]]
 then
    PROJECT_NAME=`echo ${IMAGE}|sed -r 's|\w+/||'|sed 's/:/_/'`
 fi
-
+echo ${PROJECT_NAME}
 echo -e "Starting ${PRODUCT} using: \n\t${IMAGE}"
 
 if [[ -z ${VOLUME_MOUNT} ]]
@@ -203,6 +203,6 @@ then
 else
    # To-Do
    # think of a better way to provide this capability
-   echo -e "\tUsing docker-app render ${IMAGE} ${ARGS} | sed -e '\$a\    - ${HOME}/.m2:/home/demo/.m2' -e '\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects' |  docker-compose -p intellij -f - up -d"
+   echo -e "\tUsing docker-app render ${IMAGE} ${ARGS} | sed -e '\$a\    - ${HOME}/.m2:/home/demo/.m2' -e '\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects' |  docker-compose -p ${PROJECT_NAME} -f - up -d"
    docker-app render ${IMAGE} ${ARGS}| sed -e "\$a\    - ${HOME}/.m2:/home/demo/.m2" -e "\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects" | docker-compose -p ${PROJECT_NAME} -f - ${ACTION}
 fi
