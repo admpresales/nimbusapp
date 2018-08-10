@@ -5,13 +5,14 @@ IMAGE_FILE="env"
 function usage()
 {
    echo "Usage:"
-   echo -e "\t./nimbusapp [product_name|-i <image>] [-s|--set <ARG=value>] up|down|start|stop"
+   echo -e "\t./nimbusapp [product_name|-i <image>] [-s|--set <ARG=value>] -v  up|down|start|stop"
    echo -e "\t\tproduct_name - is software product name"
    echo -e "\t\t-h --help"
    echo -e "\t\t-i - use a specific image to run. Short name (assumes admpresales)"
    echo -e "\t\t\texample: pass ${PRODUCT}:x.x.x only out of admpresales/${PRODUCT}:x.x.x"
    echo -e "\t\t-s | --set - enables you to set(override) default arguments"
-   echo -e "\t\t-p - docker-compose project name to use"
+   echo -e "\t\t-v - Intellij only - volume mounts .m2 and IdeaProject for access from the NimbusServer - EXPERIMENTAL NOT FOR CASUAL USERS"
+   echo -e "\t\t-p - docker-compose project name to use - EXPERIMENTAL NOT RECOMMENDED FOR CASUAL USERS"
    echo -e "\t\tup - starts up a container (pulls down image if not present)"
    echo -e "\t\tdown - stops AND TERMINATES (removes) the container(s)"
    echo -e "\t\tstart - starts existing container(s)"
@@ -36,10 +37,27 @@ function product_exists(){
    fi
 }
 
+# create folders to use for mount points
+# currently not leverated by Intellij
+function create_intellij_mount_points (){
+   IDEA="IdeaProjects_docker"
+   # if the folder doesn't exist, create it so it is owned by the user
+   if [ ! -d "${HOME}/${IDEA}" ]
+   then
+      mkdir ${HOME}/${IDEA}
+   fi
+
+   if [ ! -d "${HOME}/.m2" ]
+   then
+      mkdir ${HOME}/.m2
+   fi
+}
+
 PRODUCT=""
 PROJECT_NAME=""
 ACTION=""
 ACTION_COUNT=0
+VOLUME_MOUNT=""
 
 IMAGE_COUNT=`echo "$@"|grep -o "\-i"|wc -l`
 if [[ ${IMAGE_COUNT} -eq 0 ]]
@@ -84,6 +102,18 @@ while [[ "$1" != "" ]]; do
       -s)
          ARGS="${ARGS} $1 $2"
          shift
+         shift
+         ;;
+      -v)
+         # check to see if intellij is being called.  since args can appear in differ order, checking all 3 places:
+         # product, image or if it is a command not yet processed
+         if [[ (`echo ${PRODUCT}|grep "intellij"| wc -l` -eq 1) || (`echo ${IMAGE}|grep "intellij"| wc -l` -eq 1) || (`echo "$@" |grep "intellij"| wc -l` -eq 1)]]
+         then
+            VOLUME_MOUNT="-e '\$a\    - ${HOME}/.m2:/home/demo/.m2' -e '\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects'"
+            create_intellij_mount_points
+         else
+            echo "The '-v' option is only available with Intellij at this time.  Ignoring."
+         fi
          shift
          ;;
       -p)
@@ -165,6 +195,14 @@ then
 fi
 
 echo -e "Starting ${PRODUCT} using: \n\t${IMAGE}"
-echo -e "\tUsing docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT_NAME} -f - ${ACTION}"
-docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT_NAME} -f - ${ACTION}
 
+if [[ -z ${VOLUME_MOUNT} ]]
+then
+   echo -e "\tUsing docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT_NAME} -f - ${ACTION}"
+   docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT_NAME} -f - ${ACTION}
+else
+   # To-Do
+   # think of a better way to provide this capability
+   echo -e "\tUsing docker-app render ${IMAGE} ${ARGS} | sed -e '\$a\    - ${HOME}/.m2:/home/demo/.m2' -e '\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects' |  docker-compose -p intellij -f - up -d"
+   docker-app render ${IMAGE} ${ARGS}| sed -e "\$a\    - ${HOME}/.m2:/home/demo/.m2" -e "\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects" | docker-compose -p ${PROJECT_NAME} -f - ${ACTION}
+fi
