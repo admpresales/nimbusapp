@@ -166,5 +166,5 @@ fi
 
 echo -e "Starting ${PRODUCT} using: \n\t${IMAGE}"
 echo -e "\tUsing docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT_NAME} -f - ${ACTION}"
-#docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT_NAME} -f - ${ACTION}
+docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT_NAME} -f - ${ACTION}
 

@@ -2,8 +2,14 @@
 #aos.dockerapp admpresales/aos.dockerapp:1.1.3.3
 aos.dockerapp admpresales/aos.dockerapp:1.1.5
 
+#DA - Deployment Automation
+da.dockerapp admpresales/da.dockerapp:6.2.0
+
 #DEVOPS
 devops.dockerapp admpresales/devops.dockerapp:1.1.5.0
 
+#INTELLIJ
+intellij.dockerapp admpresales/intellij.dockerapp:1.1.3.6
+
 #OCTANE
-octane.dockerapp admpresales/octane.dockerapp:12.60.4.98:wq
+octane.dockerapp admpresales/octane.dockerapp:12.60.4.98
