@@ -6,4 +6,4 @@ aos.dockerapp admpresales/aos.dockerapp:1.1.5
 devops.dockerapp admpresales/devops.dockerapp:1.1.5.0
 
 #OCTANE
-octane.dockerapp admpresales/octane.dockerapp:12.60.4.98
+octane.dockerapp admpresales/octane.dockerapp:12.60.4.98:wq
