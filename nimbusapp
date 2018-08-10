@@ -41,24 +41,25 @@ PROJECT_NAME=""
 ACTION=""
 ACTION_COUNT=0
 
-if [[ $(product_exists $1) -eq 1 ]]
+IMAGE_COUNT=`echo "$@"|grep -o "\-i"|wc -l`
+if [[ ${IMAGE_COUNT} -eq 0 ]]
 then
-   echo "Could not find that product."
+   if [[ $(product_exists $1) -eq 1 ]]
+   then
+      echo "Could not find that product."
+      usage
+      exit 1
+   else
+      PRODUCT=$1.dockerapp
+      shift
+   fi
+fi
+
+if [[ ${IMAGE_COUNT} -gt 1 ]]
+then
+   echo "Only allowed to pass one image to the script"
    usage
    exit 1
-else
-   if [[ `echo "$@"|grep -o "\-i"|wc -l` -ge 1 ]]
-   then
-      echo "You must only pass a product name OR a specified image (-i).  NOT both."
-      usage
-      if [[ `echo "$@"|grep -o "\-i"|wc -l` -gt 1 ]]
-      then
-         echo "Only one (single) image is allowed to be passed"
-      fi
-      exit 1
-   fi
-   PRODUCT=$1.dockerapp
-   shift
 fi
 
 while [[ "$1" != "" ]]; do
@@ -70,6 +71,12 @@ while [[ "$1" != "" ]]; do
          exit
          ;;
       -i)
+         if [[ ! -z ${PRODUCT} ]]
+         then
+            echo "Not allowed to pass a product name and an image name at the same time."
+            usage
+            exit
+         fi
          IMAGE="admpresales/$2"
          shift
          shift
@@ -126,6 +133,7 @@ while [[ "$1" != "" ]]; do
          ;;
       *)
          echo "Invalid agument passed: $1"
+         echo "Make sure your are NOT passing a product AND and image (-i) at the same time"
          echo "Aborting"
          usage
          exit 1
@@ -158,5 +166,5 @@ fi
 
 echo -e "Starting ${PRODUCT} using: \n\t${IMAGE}"
 echo -e "\tUsing docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT_NAME} -f - ${ACTION}"
-docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT_NAME} -f - ${ACTION}
+#docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT_NAME} -f - ${ACTION}
 
