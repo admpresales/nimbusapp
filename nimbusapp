@@ -64,8 +64,13 @@ if [[ ${IMAGE_COUNT} -eq 0 ]]
 then
    if [[ $(product_exists $1) -eq 1 ]]
    then
-      echo "Could not find that product."
-      usage
+      if [[ $1 == '-h' || $1 == '--help' ]]
+      then
+         usage
+      else
+         echo "Could not find that product."
+         usage
+      fi
       exit 1
    else
       PRODUCT=$1.dockerapp
