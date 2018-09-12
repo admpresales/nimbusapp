@@ -141,14 +141,14 @@ if [[ -z ${PROJECT} ]]; then
 fi
 
 #Build Command
-COMMAND="docker-app"
-
 if [[ $ACTION == "inspect" ]]; then
     DOCKERAPP_ACTION="inspect"
     ISDOCKERAPPACTION=true
 elif [[ $ACTION == "render" ]]; then
     ISDOCKERAPPACTION=true
 fi
+
+COMMAND="docker-app ${DOCKERAPP_ACTION}"
 
 if [[ ! ${ARGS} == "" ]]; then
     COMMAND="${COMMAND} ${ARGS}"
