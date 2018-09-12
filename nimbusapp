@@ -124,6 +124,7 @@ while [[ "$1" != "" ]]; do
             ACTION_COUNT=1
             ACTION="up -d"
             shift
+            break
          fi
          ;;
       down | start | stop | ps | rm )
@@ -134,7 +135,7 @@ while [[ "$1" != "" ]]; do
             ACTION_COUNT=1
             ACTION="${PARAM}"
             shift
-            return
+            break
          fi
          ;;
       logs )
@@ -145,7 +146,7 @@ while [[ "$1" != "" ]]; do
             ACTION_COUNT=1
             ACTION="${PARAM}"
             shift
-            return
+            break
          fi
          ;;
       *)
