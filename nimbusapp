@@ -28,7 +28,7 @@ function usage()
 
 function product_exists(){
    #if we find an entry, return 0 for success, else 1 for failure
-   if [[ `grep ${REPOSITORY}/${IMAGE}.dockerapp ${ENV_FILE} | wc -l` -eq 1 ]]
+   if [[ $(grep ${REPOSITORY}/${IMAGE}.dockerapp ${ENV_FILE} | wc -l) -eq 1 ]]
    then
       return 0
    else
