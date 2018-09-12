@@ -74,7 +74,6 @@ if [[ "$IMAGE" == *\/* ]]; then
 fi
 PROJECT=$(echo $IMAGE | cut -d':' -f1 )
 # IMAGE="admpresales/${IMAGE}.dockerapp"
-fi
 
 while [[ "$1" != "" ]]; do
   PARAM=$1
