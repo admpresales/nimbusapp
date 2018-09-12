@@ -131,7 +131,7 @@ while [[ "$1" != "" ]]; do
             multiple_actions
          else
             ACTION_COUNT=1
-            ACTION="down"
+            ACTION="${PARAM}"
             shift
          fi
          ;;
