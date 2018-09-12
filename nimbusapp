@@ -30,9 +30,9 @@ function product_exists(){
    #if we find an entry, return 0 for success, else 1 for failure
    if [[ `grep "^$1.dockerapp " ${ENV_FILE}| wc -l` -eq 1 ]]
    then
-      echo 0
+      return true
    else
-      echo 1
+      return false
    fi
 }
 
@@ -76,7 +76,7 @@ echo $ENV_FILE
 if [[ "$IMAGE" == *:* ]]; then
   VERSION=$(echo $IMAGE | cut -d':' -f2 )
   IMAGE=$(echo $IMAGE | cut -d':' -f1 )
-elif [[ -e $ENV_FILE ]]; then
+elif [[ -e $ENV_FILE && $(product_exists ${IMAGE}) ]]; then
   VERSION=$(grep ${REPOSITORY}/${IMAGE}.dockerapp ${ENV_FILE} | cut -d':' -f2 )
 fi
 
@@ -132,21 +132,21 @@ done
 
 if [[ -z ${ACTION} ]]
 then
-   echo "You must specify an action up|down|start|stop"
+   echo "You must specify a command"
    usage
    exit 1
 fi
 
-if [[ -z ${IMAGE} ]]
-then
-   if [ `grep "^${PRODUCT} " ${IMAGE_FILE}| wc -l` -eq 1 ]
-   then
-      IMAGE=`grep "^${PRODUCT} " ${IMAGE_FILE}|awk '{print $2}'`
-   else
-      echo "Your env file contains multiple entires for ${PRODUCT}"
-      exit 1
-   fi
-fi
+#if [[ -z ${IMAGE} ]]
+#then
+#   if [ `grep "^${PRODUCT} " ${IMAGE_FILE}| wc -l` -eq 1 ]
+#   then
+#      IMAGE=`grep "^${PRODUCT} " ${IMAGE_FILE}|awk '{print $2}'`
+#   else
+#      echo "Your env file contains multiple entires for ${PRODUCT}"
+#      exit 1
+#   fi
+#fi
 
 #create a project name for the docker-compose based on the image name.
 if [[ -z ${PROJECT} ]]
