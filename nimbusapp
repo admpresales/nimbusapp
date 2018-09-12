@@ -67,8 +67,8 @@ if [[ $IMAGE = *"help"* ]]; then
   exit 0
 fi
 if [[ $IMAGE != *".dockerapp" ]]; then
-  PROJECT=$IMAGE
-  IMAGE="admpresales/${IMAGE}.dockerapp"
+  PROJECT=$(echo $IMAGE | cut -d':' -f1 )
+# IMAGE="admpresales/${IMAGE}.dockerapp"
   shift
 fi
 
