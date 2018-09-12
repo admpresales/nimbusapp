@@ -22,8 +22,6 @@ function usage()
    echo -e "  start  Start existing containers"
    echo -e "  stop   Stop existing containers"
    echo -e "  up     Creates and start containers"
-
-   echo ""
 }
 
 function product_exists(){
