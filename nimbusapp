@@ -143,9 +143,9 @@ fi
 #Build Command
 if [[ $ACTION == "inspect" ]]; then
     DOCKERAPP_ACTION="inspect"
-    ISDOCKERAPPACTION=true
+    ISDOCKERAPPACTION=0
 elif [[ $ACTION == "render" ]]; then
-    ISDOCKERAPPACTION=true
+    ISDOCKERAPPACTION=1
 fi
 
 COMMAND="docker-app ${DOCKERAPP_ACTION}"
@@ -156,7 +156,7 @@ fi
 
 COMMAND="${COMMAND} ${REPOSITORY}/${IMAGE}:${VERSION}"
 
-if [[ ! ${ISDOCKERAPPACTION} ]] ; then
+if [[ ${ISDOCKERAPPACTION} -eq 1 ]] ; then
     if [[ -z ${VOLUME_MOUNT} ]]; then
         COMMAND="${COMMAND} | docker-compose -p ${PROJECT} -f - ${ACTION} $@"
     else
