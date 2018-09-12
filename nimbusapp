@@ -117,7 +117,7 @@ while [[ "$1" != "" ]]; do
         shift
         break
         ;;
-      down | start | stop | ps | rm | break | render | inspect | logs )
+      down | start | stop | ps | rm | render | inspect | logs )
         ACTION="${PARAM}"
         shift
         break
