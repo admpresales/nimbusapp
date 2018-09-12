@@ -82,7 +82,7 @@ if [[ "$IMAGE" == *:* ]]; then
 else
   echo "Checking  file"
   TEMP_IMAGE=$(cat ~/.nimbusapp/env | grep ${IMAGE}.dockerapp | awk '{print $2}')
-  if [[ !$TEMP_IMAGE == "" ]]; then
+  if [[ ! $TEMP_IMAGE == "" ]]; then
     IMAGE=$(grep ${IMAGE}.dockerapp ${ENV_FILE} | awk '{print $2}')
     VERSION=$(echo $IMAGE | cut -d':' -f2 )
     IMAGE=$(echo $IMAGE | cut -d':' -f1 )
