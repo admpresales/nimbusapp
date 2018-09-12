@@ -184,11 +184,11 @@ echo -e "Starting ${PRODUCT} using: ${IMAGE}"
 
 
 if [[ -z ${VOLUME_MOUNT} ]]; then
-   COMMAND="docker-app render ${ARGS} ${IMAGE} | docker-compose -p ${PROJECT} -f - ${ACTION}"
+   COMMAND="docker-app render ${ARGS} ${REPOSITORY}/${IMAGE} | docker-compose -p ${PROJECT} -f - ${ACTION}"
 else
    # To-Do
    # think of a better way to provide this capability
-   docker-app render ${REPOSITORY}/${IMAGE} ${ARGS} | sed -e "\$a\    - ${HOME}/.m2:/home/demo/.m2" -e "\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects" | docker-compose -p ${PROJECT} -f - ${ACTION}
+   COMMAND="docker-app render ${ARGS} ${REPOSITORY}/${IMAGE} | sed -e "\$a\    - ${HOME}/.m2:/home/demo/.m2" -e "\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects" | docker-compose -p ${PROJECT} -f - ${ACTION}"
 fi
 
 echo -e "Using ${COMMAND}"
