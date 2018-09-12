@@ -80,7 +80,7 @@ if [[ "$IMAGE" == *:* ]]; then
   VERSION=$(echo $IMAGE | cut -d':' -f2 )
   IMAGE=$(echo $IMAGE | cut -d':' -f1 )
 else
-  echo "Checking env file"
+  echo "Checking  file"
   TEMP_IMAGE=$(cat ~/.nimbusapp/env | grep ${IMAGE}.dockerapp | awk '{print $2}')
   if [[ !$TEMP_IMAGE == "" ]]; then
     IMAGE=$(grep ${IMAGE}.dockerapp ${ENV_FILE} | awk '{print $2}')
@@ -193,8 +193,7 @@ if [[ -z ${PROJECT} ]]
 then
    PROJECT=`echo ${IMAGE}|sed -r 's|\w+/||'|sed 's/:/_/'`
 fi
-echo ${PROJECT}
-echo -e "Starting ${PRODUCT} using: ${IMAGE}"
+echo -e "Starting ${PROJECT} using: ${IMAGE}"
 
 
 
