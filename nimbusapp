@@ -4,30 +4,26 @@ ENV_FILE="${HOME}/.nimbusapp/env"
 
 function usage()
 {
-   echo "Usage: nimbusapp [PRODUCT_NAME | <IMAGE>] [OPTIONS] COMMAND"
+   echo "Usage: nimbusapp <IMAGE>:<VERSION> [OPTIONS] COMMAND"
    echo -e ""
    echo -e "Options:"
-   echo -e "  product_name - is software product name"
-   echo -e "  -i         Use a specific image to run. Short name (assumes admpresales)"
-   echo -e "             Example: pass ${PRODUCT}:x.x.x only out of admpresales/${PRODUCT}:x.x.x"
+   echo -e "  IMAGE      The Docker App file you wish to run. If no repository is provided, admpresales is assumed."
+   echo -e "             dockerapp is added if not explicitly stated."
+   echo -e "  VERSION    The version of the Docker App file you wish to run."
    echo -e "  -s, --set  Enables you to set(override) default arguments"
    echo -e "  -v         Volume mounts .m2 and IdeaProject for access from the NimbusServer - EXPERIMENTAL NOT FOR CASUAL USERS"
    echo -e "  -p         Docker-compose project name to use - EXPERIMENTAL NOT RECOMMENDED FOR CASUAL USERS"
    echo -e ""
    echo -e "Commands:"
    echo -e "  down   Stop and remove containers"
+   echo -e "  logs   Shows logs for containers"
    echo -e "  ps     Lists containers"
+   echo -e "  rm     Remove stopped containers"
    echo -e "  start  Start existing containers"
    echo -e "  stop   Stop existing containers"
    echo -e "  up     Creates and start containers"
-   echo ""
-}
 
-function multiple_actions(){
-   echo "You can only perform one action.  Current action is '${ACTION}' and you attempting to add '$1'"
-   echo "Aborting"
-   usage;
-   exit 1;
+   echo ""
 }
 
 function product_exists(){
@@ -117,44 +113,20 @@ while [[ "$1" != "" ]]; do
          shift
          ;;
       up)
-         #If ACTION has already been set
-         if [[ ${ACTION_COUNT} -gt 0 ]]; then
-            multiple_actions
-         else
-            ACTION_COUNT=1
-            ACTION="up -d"
-            shift
-            break
-         fi
-         ;;
-      down | start | stop | ps | rm )
-         #If ACTION has already been set
-         if [[ ${ACTION_COUNT} -gt 0 ]]; then
-            multiple_actions
-         else
-            ACTION_COUNT=1
-            ACTION="${PARAM}"
-            shift
-            break
-         fi
-         ;;
-      logs )
-         #If ACTION has already been set
-         if [[ ${ACTION_COUNT} -gt 0 ]]; then
-            multiple_actions
-         else
-            ACTION_COUNT=1
-            ACTION="${PARAM}"
-            shift
-            break
-         fi
-         ;;
+        ACTION="up -d"
+        shift
+        break
+        ;;
+      down | start | stop | ps | rm | break)
+        ACTION="${PARAM}"
+        shift
+        break
+        fi
+        ;;
       *)
-         echo "Invalid agument passed: $1"
-         echo "Make sure your are NOT passing a product AND and image (-i) at the same time"
-         echo "Aborting"
-         usage
-         exit 1
+       echo "Invalid agument passed: $1"
+       usage
+     exit 1
    esac
 done
 
