@@ -9,7 +9,8 @@ da.dockerapp admpresales/da.dockerapp:6.2.0
 devops.dockerapp admpresales/devops.dockerapp:1.1.5.0
 
 #INTELLIJ
-intellij.dockerapp admpresales/intellij.dockerapp:1.1.3.6
+#intellij.dockerapp admpresales/intellij.dockerapp:1.1.3.6
+intellij.dockerapp admpresales/intellij.dockerapp:1.1.5.1
 
 #OCTANE
 octane.dockerapp admpresales/octane.dockerapp:12.60.4.98
