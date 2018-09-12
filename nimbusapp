@@ -4,19 +4,21 @@ IMAGE_FILE="env"
 
 function usage()
 {
-   echo "Usage:"
-   echo -e "\t./nimbusapp [product_name|-i <image>] [-s|--set <ARG=value>] -v  up|down|start|stop"
-   echo -e "\t\tproduct_name - is software product name"
-   echo -e "\t\t-h --help"
-   echo -e "\t\t-i - use a specific image to run. Short name (assumes admpresales)"
-   echo -e "\t\t\texample: pass ${PRODUCT}:x.x.x only out of admpresales/${PRODUCT}:x.x.x"
-   echo -e "\t\t-s | --set - enables you to set(override) default arguments"
-   echo -e "\t\t-v - Intellij only - volume mounts .m2 and IdeaProject for access from the NimbusServer - EXPERIMENTAL NOT FOR CASUAL USERS"
-   echo -e "\t\t-p - docker-compose project name to use - EXPERIMENTAL NOT RECOMMENDED FOR CASUAL USERS"
-   echo -e "\t\tup - starts up a container (pulls down image if not present)"
-   echo -e "\t\tdown - stops AND TERMINATES (removes) the container(s)"
-   echo -e "\t\tstart - starts existing container(s)"
-   echo -e "\t\tstop - stops existing container(s)"
+   echo "Usage: nimbusapp [PRODUCT_NAME | <IMAGE>] [OPTIONS] COMMAND"
+   echo -e ""
+   echo -e "Options:"
+   echo -e "  product_name - is software product name"
+   echo -e "  -i         Use a specific image to run. Short name (assumes admpresales)"
+   echo -e "             Example: pass ${PRODUCT}:x.x.x only out of admpresales/${PRODUCT}:x.x.x"
+   echo -e "  -s, --set  Enables you to set(override) default arguments"
+   echo -e "  -v         Volume mounts .m2 and IdeaProject for access from the NimbusServer - EXPERIMENTAL NOT FOR CASUAL USERS"
+   echo -e "  -p         Docker-compose project name to use - EXPERIMENTAL NOT RECOMMENDED FOR CASUAL USERS"
+   echo -e ""
+   echo -e "Commands:"
+   echo -e "  up     Creates containers, or starts containers if stopped (pulls down image if not present)"
+   echo -e "  down   Stops AND TERMINATES (removes) the container(s)"
+   echo -e "  start  Starts existing container(s)"
+   echo -e "  stop   Stops existing container(s)"
    echo ""
 }
 
@@ -54,51 +56,30 @@ function create_intellij_mount_points (){
 }
 
 PRODUCT=""
-PROJECT_NAME=""
+PROJECT=""
 ACTION=""
 ACTION_COUNT=0
 VOLUME_MOUNT=""
 
-IMAGE_COUNT=`echo "$@"|grep -o "\-i"|wc -l`
-if [[ ${IMAGE_COUNT} -eq 0 ]]
-then
-   if [[ $(product_exists $1) -eq 1 ]]
-   then
-      echo "Could not find that product."
-      usage
-      exit 1
-   else
-      PRODUCT=$1.dockerapp
-      shift
-   fi
+IMAGE=$1
+if [[ $IMAGE = *"help"* ]]; then
+  usage
+  exit 0
 fi
-
-if [[ ${IMAGE_COUNT} -gt 1 ]]
-then
-   echo "Only allowed to pass one image to the script"
-   usage
-   exit 1
+if [[ $IMAGE != *".dockerapp" ]]; then
+  PROJECT=$IMAGE
+  IMAGE="admpresales/${IMAGE}.dockerapp"
+  shift
 fi
 
 while [[ "$1" != "" ]]; do
-   PARAM=$1
-   VALUE=$2
-   case $PARAM in
-      -h | --help)
-         usage
-         exit
-         ;;
-      -i)
-         if [[ ! -z ${PRODUCT} ]]
-         then
-            echo "Not allowed to pass a product name and an image name at the same time."
-            usage
-            exit
-         fi
-         IMAGE="admpresales/$2"
-         shift
-         shift
-         ;;
+  PARAM=$1
+  VALUE=$2
+  case $PARAM in
+    -h | --help)
+      usage
+      exit 0
+      ;;
       -s)
          ARGS="${ARGS} $1 $2"
          shift
@@ -117,7 +98,7 @@ while [[ "$1" != "" ]]; do
          shift
          ;;
       -p)
-         PROJECT_NAME=$2
+         PROJECT=$2
          shift
          shift
          ;;
@@ -189,20 +170,20 @@ then
 fi
 
 #create a project name for the docker-compose based on the image name.
-if [[ -z ${PROJECT_NAME} ]]
+if [[ -z ${PROJECT} ]]
 then
-   PROJECT_NAME=`echo ${IMAGE}|sed -r 's|\w+/||'|sed 's/:/_/'`
+   PROJECT=`echo ${IMAGE}|sed -r 's|\w+/||'|sed 's/:/_/'`
 fi
-echo ${PROJECT_NAME}
-echo -e "Starting ${PRODUCT} using: \n\t${IMAGE}"
+echo ${PROJECT}
+echo -e "Starting ${PRODUCT} using: ${IMAGE}"
 
 if [[ -z ${VOLUME_MOUNT} ]]
 then
-   echo -e "\tUsing docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT_NAME} -f - ${ACTION}"
-   docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT_NAME} -f - ${ACTION}
+   echo -e "Using docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT} -f - ${ACTION}"
+   docker-app render ${ARGS} ${IMAGE} | docker-compose -p ${PROJECT} -f - ${ACTION}
 else
    # To-Do
    # think of a better way to provide this capability
-   echo -e "\tUsing docker-app render ${IMAGE} ${ARGS} | sed -e '\$a\    - ${HOME}/.m2:/home/demo/.m2' -e '\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects' |  docker-compose -p ${PROJECT_NAME} -f - up -d"
-   docker-app render ${IMAGE} ${ARGS}| sed -e "\$a\    - ${HOME}/.m2:/home/demo/.m2" -e "\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects" | docker-compose -p ${PROJECT_NAME} -f - ${ACTION}
+   echo -e "Using docker-app render ${IMAGE} ${ARGS} | sed -e '\$a\    - ${HOME}/.m2:/home/demo/.m2' -e '\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects' |  docker-compose -p ${PROJECT} -f - up -d"
+   docker-app render ${IMAGE} ${ARGS}| sed -e "\$a\    - ${HOME}/.m2:/home/demo/.m2" -e "\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects" | docker-compose -p ${PROJECT} -f - ${ACTION}
 fi
