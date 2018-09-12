@@ -30,9 +30,9 @@ function product_exists(){
    #if we find an entry, return 0 for success, else 1 for failure
    if [[ `grep "^$1.dockerapp " ${ENV_FILE}| wc -l` -eq 1 ]]
    then
-      return true
+      return 0
    else
-      return false
+      return 1
    fi
 }
 
