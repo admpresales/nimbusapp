@@ -125,7 +125,7 @@ while [[ "$1" != "" ]]; do
             shift
          fi
          ;;
-      down | start | stop | status )
+      down | start | stop | ps | logs )
          #If ACTION has already been set
          if [[ ${ACTION_COUNT} -gt 0 ]]; then
             multiple_actions
