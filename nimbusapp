@@ -145,7 +145,7 @@ if [[ $ACTION == "inspect" ]]; then
     DOCKERAPP_ACTION="inspect"
     ISDOCKERAPPACTION=0
 elif [[ $ACTION == "render" ]]; then
-    ISDOCKERAPPACTION=1
+    ISDOCKERAPPACTION=0
 fi
 
 COMMAND="docker-app ${DOCKERAPP_ACTION}"
