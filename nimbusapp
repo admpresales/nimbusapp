@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IMAGE_FILE="env"
+ENV_FILE="~/.nimbusapp/env"
 
 function usage()
 {
@@ -31,7 +31,7 @@ function multiple_actions(){
 
 function product_exists(){
    #if we find an entry, return 0 for success, else 1 for failure
-   if [[ `grep "^$1.dockerapp " ${IMAGE_FILE}| wc -l` -eq 1 ]]
+   if [[ `grep "^$1.dockerapp " ${ENV_FILE}| wc -l` -eq 1 ]]
    then
       echo 0
    else
@@ -56,6 +56,7 @@ function create_intellij_mount_points (){
 }
 
 REPOSITORY=admpresales
+VERSION=""
 PRODUCT=""
 PROJECT=""
 ACTION=""
@@ -73,7 +74,15 @@ if [[ "$IMAGE" == *\/* ]]; then
   REPOSITORY=$(echo $IMAGE | cut -d'/' -f1 )
   IMAGE=$(echo $IMAGE | cut -d'/' -f2 )
 fi
-PROJECT=$(echo $IMAGE | cut -d':' -f1 )
+if [[ "$IMAGE" == *:* ]]; then
+  VERSION=$(echo $IMAGE | cut -d':' -f2 )
+  IMAGE=$(echo $IMAGE | cut -d':' -f1 )
+elif [[ -f $ENV_FILE ]]; then
+  IMAGE=`grep "^${IMAGE} " ${ENV_FILE}|awk '{print $2}'`
+  VERSION=$(echo $IMAGE | cut -d':' -f2 )
+  IMAGE=$(echo $IMAGE | cut -d':' -f1 )
+fi
+
 # IMAGE="admpresales/${IMAGE}.dockerapp"
 
 while [[ "$1" != "" ]]; do
