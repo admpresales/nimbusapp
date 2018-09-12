@@ -128,26 +128,30 @@ while [[ "$1" != "" ]]; do
    esac
 done
 
-if [[ -z ${ACTION} ]]
-then
+if [[ -z ${ACTION} ]]; then
    echo "You must specify a command"
    usage
    exit 1
 fi
 
 #create a project name for the docker-compose based on the image name.
-if [[ -z ${PROJECT} ]]
-then
+if [[ -z ${PROJECT} ]]; then
    PROJECT=`echo ${IMAGE}|sed -r 's|\w+/||'|sed 's/:/_/'`
 fi
-echo -e "Starting ${PROJECT} using: ${IMAGE}"
+
+#Build Command
+COMMAND="docker-app render"
+if [[ ! ${ARGS} == "" ]]; then
+    COMMAND="${COMMAND} ${ARGS}"
+fi
+
+COMMAND="${COMMAND} ${REPOSITORY}/${IMAGE}:${VERSION}"
 
 if [[ -z ${VOLUME_MOUNT} ]]; then
-   COMMAND="docker-app render ${ARGS} ${REPOSITORY}/${IMAGE}:${VERSION} | docker-compose -p ${PROJECT} -f - ${ACTION} $@"
+   COMMAND="${COMMAND} | docker-compose -p ${PROJECT} -f - ${ACTION} $@"
 else
-   # To-Do
-   # think of a better way to provide this capability
-   COMMAND="docker-app render ${ARGS} ${REPOSITORY}/${IMAGE}:${VERSION} | sed -e "\$a\    - ${HOME}/.m2:/home/demo/.m2" -e "\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects" | docker-compose -p ${PROJECT} -f - ${ACTION} $@"
+   # TODO: think of a better way to provide this capability
+   COMMAND="${COMMAND} | sed -e "\$a\    - ${HOME}/.m2:/home/demo/.m2" -e "\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects" | docker-compose -p ${PROJECT} -f - ${ACTION} $@"
 fi
 
 echo -e "Using ${COMMAND}"
