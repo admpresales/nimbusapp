@@ -85,6 +85,7 @@ else
     IMAGE=$(grep ${IMAGE}.dockerapp ${ENV_FILE} | awk '{print $2}')
     VERSION=$(echo $IMAGE | cut -d':' -f2 )
     IMAGE=$(echo $IMAGE | cut -d':' -f1 )
+  fi
 fi
 
 # IMAGE="admpresales/${IMAGE}.dockerapp"
