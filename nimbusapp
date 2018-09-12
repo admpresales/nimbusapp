@@ -1,7 +1,6 @@
 #!/bin/bash
 
-ENV_FILE="~/.nimbusapp/env"
-eval "ENVFILE=$ENV_FILE"
+ENV_FILE="${HOME}/.nimbusapp/env"
 
 function usage()
 {
