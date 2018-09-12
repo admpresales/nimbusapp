@@ -77,7 +77,8 @@ fi
 if [[ "$IMAGE" == *:* ]]; then
   VERSION=$(echo $IMAGE | cut -d':' -f2 )
   IMAGE=$(echo $IMAGE | cut -d':' -f1 )
-elif [[ -f $ENV_FILE ]]; then
+elif [ -f $ENV_FILE ]; then
+  echo "Getting version from ${ENV_FILE}"
   IMAGE=$(grep ${IMAGE}.dockerapp ${ENV_FILE} | awk '{print $2}')
   VERSION=$(echo $IMAGE | cut -d':' -f2 )
   IMAGE=$(echo $IMAGE | cut -d':' -f1 )
