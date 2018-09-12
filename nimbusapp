@@ -55,6 +55,7 @@ function create_intellij_mount_points (){
    fi
 }
 
+REPOSITORY=admpresales
 PRODUCT=""
 PROJECT=""
 ACTION=""
@@ -62,14 +63,17 @@ ACTION_COUNT=0
 VOLUME_MOUNT=""
 
 IMAGE=$1
+shift
 if [[ $IMAGE = *"help"* ]]; then
   usage
   exit 0
 fi
-if [[ $IMAGE != *".dockerapp" ]]; then
-  PROJECT=$(echo $IMAGE | cut -d':' -f1 )
+if [[ "$IMAGE" == *\/* ]]; then
+  REPOSITORY=$(echo $IMAGE | cut -d'/' -f1 )
+  IMAGE=$(echo $IMAGE | cut -d'/' -f2 )
+fi
+PROJECT=$(echo $IMAGE | cut -d':' -f1 )
 # IMAGE="admpresales/${IMAGE}.dockerapp"
-  shift
 fi
 
 while [[ "$1" != "" ]]; do
@@ -177,13 +181,15 @@ fi
 echo ${PROJECT}
 echo -e "Starting ${PRODUCT} using: ${IMAGE}"
 
-if [[ -z ${VOLUME_MOUNT} ]]
-then
-   echo -e "Using docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT} -f - ${ACTION}"
-   docker-app render ${ARGS} ${IMAGE} | docker-compose -p ${PROJECT} -f - ${ACTION}
+
+
+if [[ -z ${VOLUME_MOUNT} ]]; then
+   COMMAND="docker-app render ${ARGS} ${IMAGE} | docker-compose -p ${PROJECT} -f - ${ACTION}"
 else
    # To-Do
    # think of a better way to provide this capability
-   echo -e "Using docker-app render ${IMAGE} ${ARGS} | sed -e '\$a\    - ${HOME}/.m2:/home/demo/.m2' -e '\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects' |  docker-compose -p ${PROJECT} -f - up -d"
-   docker-app render ${IMAGE} ${ARGS}| sed -e "\$a\    - ${HOME}/.m2:/home/demo/.m2" -e "\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects" | docker-compose -p ${PROJECT} -f - ${ACTION}
+   docker-app render ${REPOSITORY}/${IMAGE} ${ARGS} | sed -e "\$a\    - ${HOME}/.m2:/home/demo/.m2" -e "\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects" | docker-compose -p ${PROJECT} -f - ${ACTION}
 fi
+
+echo -e "Using ${COMMAND}"
+eval ${COMMAND}
