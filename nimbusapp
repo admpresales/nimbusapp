@@ -69,6 +69,7 @@ if [[ $IMAGE = *"help"* ]]; then
   exit 0
 fi
 if [[ "$IMAGE" == *\/* ]]; then
+  echo "Slash found"
   REPOSITORY=$(echo $IMAGE | cut -d'/' -f1 )
   IMAGE=$(echo $IMAGE | cut -d'/' -f2 )
 fi
