@@ -121,7 +121,6 @@ while [[ "$1" != "" ]]; do
         ACTION="${PARAM}"
         shift
         break
-        fi
         ;;
       *)
        echo "Invalid agument passed: $1"
