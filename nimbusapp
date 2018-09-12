@@ -15,10 +15,11 @@ function usage()
    echo -e "  -p         Docker-compose project name to use - EXPERIMENTAL NOT RECOMMENDED FOR CASUAL USERS"
    echo -e ""
    echo -e "Commands:"
-   echo -e "  up     Creates containers, or starts containers if stopped (pulls down image if not present)"
-   echo -e "  down   Stops AND TERMINATES (removes) the container(s)"
-   echo -e "  start  Starts existing container(s)"
-   echo -e "  stop   Stops existing container(s)"
+   echo -e "  down   Stop and remove containers"
+   echo -e "  ps     Lists containers"
+   echo -e "  start  Start existing containers"
+   echo -e "  stop   Stop existing containers"
+   echo -e "  up     Creates and start containers"
    echo ""
 }
 
@@ -125,7 +126,7 @@ while [[ "$1" != "" ]]; do
             shift
          fi
          ;;
-      down | start | stop | ps | logs )
+      down | start | stop | ps | rm )
          #If ACTION has already been set
          if [[ ${ACTION_COUNT} -gt 0 ]]; then
             multiple_actions
@@ -133,6 +134,18 @@ while [[ "$1" != "" ]]; do
             ACTION_COUNT=1
             ACTION="${PARAM}"
             shift
+            return
+         fi
+         ;;
+      logs )
+         #If ACTION has already been set
+         if [[ ${ACTION_COUNT} -gt 0 ]]; then
+            multiple_actions
+         else
+            ACTION_COUNT=1
+            ACTION="${PARAM}"
+            shift
+            return
          fi
          ;;
       *)
@@ -169,14 +182,12 @@ then
 fi
 echo -e "Starting ${PROJECT} using: ${IMAGE}"
 
-
-
 if [[ -z ${VOLUME_MOUNT} ]]; then
-   COMMAND="docker-app render ${ARGS} ${REPOSITORY}/${IMAGE}:${VERSION} | docker-compose -p ${PROJECT} -f - ${ACTION}"
+   COMMAND="docker-app render ${ARGS} ${REPOSITORY}/${IMAGE}:${VERSION} | docker-compose -p ${PROJECT} -f - ${ACTION} $@"
 else
    # To-Do
    # think of a better way to provide this capability
-   COMMAND="docker-app render ${ARGS} ${REPOSITORY}/${IMAGE}:${VERSION} | sed -e "\$a\    - ${HOME}/.m2:/home/demo/.m2" -e "\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects" | docker-compose -p ${PROJECT} -f - ${ACTION}"
+   COMMAND="docker-app render ${ARGS} ${REPOSITORY}/${IMAGE}:${VERSION} | sed -e "\$a\    - ${HOME}/.m2:/home/demo/.m2" -e "\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects" | docker-compose -p ${PROJECT} -f - ${ACTION} $@"
 fi
 
 echo -e "Using ${COMMAND}"
