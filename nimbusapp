@@ -56,7 +56,7 @@ function create_intellij_mount_points (){
 }
 
 REPOSITORY=admpresales
-VERSION=""
+VERSION="latest"
 PRODUCT=""
 PROJECT=""
 ACTION=""
@@ -78,7 +78,7 @@ if [[ "$IMAGE" == *:* ]]; then
   VERSION=$(echo $IMAGE | cut -d':' -f2 )
   IMAGE=$(echo $IMAGE | cut -d':' -f1 )
 elif [[ -f $ENV_FILE ]]; then
-  IMAGE=`grep "^${IMAGE}.dockerapp " ${ENV_FILE}|awk '{print $2}'`
+  IMAGE=$(grep ${IMAGE}.dockerapp ${ENV_FILE} | awk '{print $2}')
   VERSION=$(echo $IMAGE | cut -d':' -f2 )
   IMAGE=$(echo $IMAGE | cut -d':' -f1 )
 fi
