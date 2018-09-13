@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ENV_FILE="${HOME}/.nimbusapp/env"
+ENV_FILE="${HOME}/.nimbusapp/apps.config"
 
 function usage()
 {
