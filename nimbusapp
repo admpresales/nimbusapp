@@ -1,39 +1,39 @@
 #!/bin/bash
 
-IMAGE_FILE="env"
+ENV_FILE="${HOME}/.nimbusapp/apps.config"
 
 function usage()
 {
-   echo "Usage:"
-   echo -e "\t./nimbusapp [product_name|-i <image>] [-s|--set <ARG=value>] -v  up|down|start|stop"
-   echo -e "\t\tproduct_name - is software product name"
-   echo -e "\t\t-h --help"
-   echo -e "\t\t-i - use a specific image to run. Short name (assumes admpresales)"
-   echo -e "\t\t\texample: pass ${PRODUCT}:x.x.x only out of admpresales/${PRODUCT}:x.x.x"
-   echo -e "\t\t-s | --set - enables you to set(override) default arguments"
-   echo -e "\t\t-v - Intellij only - volume mounts .m2 and IdeaProject for access from the NimbusServer - EXPERIMENTAL NOT FOR CASUAL USERS"
-   echo -e "\t\t-p - docker-compose project name to use - EXPERIMENTAL NOT RECOMMENDED FOR CASUAL USERS"
-   echo -e "\t\tup - starts up a container (pulls down image if not present)"
-   echo -e "\t\tdown - stops AND TERMINATES (removes) the container(s)"
-   echo -e "\t\tstart - starts existing container(s)"
-   echo -e "\t\tstop - stops existing container(s)"
-   echo ""
-}
-
-function multiple_actions(){
-   echo "You can only perform one action.  Current action is '${ACTION}' and you attempting to add '$1'"
-   echo "Aborting"
-   usage;
-   exit 1;
+   echo "Usage: nimbusapp <IMAGE>:<VERSION> [OPTIONS] COMMAND"
+   echo -e ""
+   echo -e "Options:"
+   echo -e "  IMAGE      The Docker App file you wish to run. If no repository is provided, admpresales is assumed."
+   echo -e "             dockerapp is added if not explicitly stated."
+   echo -e "  VERSION    The version of the Docker App file you wish to run."
+   echo -e "  -s, --set  Enables you to set(override) default arguments"
+   echo -e "  -v         Volume mounts .m2 and IdeaProject for access from the NimbusServer - EXPERIMENTAL NOT FOR CASUAL USERS"
+   echo -e "  -p         Docker-compose project name to use - EXPERIMENTAL NOT RECOMMENDED FOR CASUAL USERS"
+   echo -e ""
+   echo -e "Commands:"
+   echo -e "  down     Stop and remove containers"
+   echo -e "  inspect  Shows metadata and settings for a given application"
+   echo -e "  logs     Shows logs for containers"
+   echo -e "  ps       Lists containers"
+   echo -e "  render   Render the Compose file for the application"
+   echo -e "  rm       Remove stopped containers"
+   echo -e "  start    Start existing containers"
+   echo -e "  stop     Stop existing containers"
+   echo -e "  up       Creates and start containers"
 }
 
 function product_exists(){
    #if we find an entry, return 0 for success, else 1 for failure
-   if [[ `grep "^$1.dockerapp " ${IMAGE_FILE}| wc -l` -eq 1 ]]
+   echo
+   if [[ $(grep ${REPOSITORY}/${IMAGE}.dockerapp ${ENV_FILE} | wc -l) -eq 1 ]]
    then
-      echo 0
+      return 0
    else
-      echo 1
+      return 1
    fi
 }
 
@@ -53,57 +53,43 @@ function create_intellij_mount_points (){
    fi
 }
 
-PRODUCT=""
-PROJECT_NAME=""
+REPOSITORY=admpresales
+VERSION="latest"
+PROJECT=""
 ACTION=""
-ACTION_COUNT=0
 VOLUME_MOUNT=""
+ISDOCKERAPPACTION=1
+DOCKERAPP_ACTION="render"
 
-IMAGE_COUNT=`echo "$@"|grep -o "\-i"|wc -l`
-if [[ ${IMAGE_COUNT} -eq 0 ]]
-then
-   if [[ $(product_exists $1) -eq 1 ]]
-   then
-      if [[ $1 == '-h' || $1 == '--help' ]]
-      then
-         usage
-      else
-         echo "Could not find that product."
-         usage
-      fi
-      exit 1
-   else
-      PRODUCT=$1.dockerapp
-      shift
-   fi
+IMAGE=$1
+shift
+if [[ $IMAGE = *"help"* ]]; then
+  usage
+  exit 0
+fi
+if [[ "$IMAGE" == *\/* ]]; then
+  REPOSITORY=$(echo $IMAGE | cut -d'/' -f1 )
+  IMAGE=$(echo $IMAGE | cut -d'/' -f2 )
 fi
 
-if [[ ${IMAGE_COUNT} -gt 1 ]]
-then
-   echo "Only allowed to pass one image to the script"
-   usage
-   exit 1
+if [[ "$IMAGE" == *:* ]]; then
+  VERSION=$(echo $IMAGE | cut -d':' -f2 )
+  IMAGE=$(echo $IMAGE | cut -d':' -f1 )
+elif [[ -e $ENV_FILE && $(product_exists) -eq 0 ]]; then
+  VERSION=$(grep ${REPOSITORY}/${IMAGE}.dockerapp ${ENV_FILE} | cut -d':' -f2 )
+  echo "Using version in ${ENV_FILE}: ${VERSION}"
 fi
+
+# IMAGE="admpresales/${IMAGE}.dockerapp"
 
 while [[ "$1" != "" ]]; do
-   PARAM=$1
-   VALUE=$2
-   case $PARAM in
-      -h | --help)
-         usage
-         exit
-         ;;
-      -i)
-         if [[ ! -z ${PRODUCT} ]]
-         then
-            echo "Not allowed to pass a product name and an image name at the same time."
-            usage
-            exit
-         fi
-         IMAGE="admpresales/$2"
-         shift
-         shift
-         ;;
+  PARAM=$1
+  VALUE=$2
+  case $PARAM in
+    -h | --help)
+      usage
+      exit 0
+      ;;
       -s)
          ARGS="${ARGS} $1 $2"
          shift
@@ -122,92 +108,62 @@ while [[ "$1" != "" ]]; do
          shift
          ;;
       -p)
-         PROJECT_NAME=$2
+         PROJECT=$2
          shift
          shift
          ;;
       up)
-         #If ACTION has already been set
-         if [[ ${ACTION_COUNT} -gt 0 ]]; then
-            multiple_actions
-         else
-            ACTION_COUNT=1
-            ACTION="up -d"
-            shift
-         fi
-         ;;
-      down)
-         #If ACTION has already been set
-         if [[ ${ACTION_COUNT} -gt 0 ]]; then
-            multiple_actions
-         else
-            ACTION_COUNT=1
-            ACTION="down"
-            shift
-         fi
-         ;;
-      start)
-         #If ACTION has already been set
-         if [[ ${ACTION_COUNT} -gt 0 ]]; then
-            multiple_actions
-         else
-            ACTION_COUNT=1
-            ACTION="start"
-            shift
-         fi
-         ;;
-      stop)
-         #If ACTION has already been set
-         if [[ ${ACTION_COUNT} -gt 0 ]]; then
-            multiple_actions
-         else
-            ACTION_COUNT=1
-            ACTION="stop"
-            shift
-         fi
-         ;;
+        ACTION="up -d"
+        shift
+        break
+        ;;
+      down | start | stop | ps | rm | render | inspect | logs )
+        ACTION="${PARAM}"
+        shift
+        break
+        ;;
       *)
-         echo "Invalid agument passed: $1"
-         echo "Make sure your are NOT passing a product AND and image (-i) at the same time"
-         echo "Aborting"
-         usage
-         exit 1
+       echo "Invalid agument passed: $1"
+       usage
+     exit 1
    esac
 done
 
-if [[ -z ${ACTION} ]]
-then
-   echo "You must specify an action up|down|start|stop"
+if [[ -z ${ACTION} ]]; then
+   echo "You must specify a command"
    usage
    exit 1
 fi
 
-if [[ -z ${IMAGE} ]]
-then
-   if [ `grep "^${PRODUCT} " ${IMAGE_FILE}| wc -l` -eq 1 ]
-   then
-      IMAGE=`grep "^${PRODUCT} " ${IMAGE_FILE}|awk '{print $2}'`
-   else
-      echo "Your env file contains multiple entires for ${PRODUCT}"
-      exit 1
-   fi
-fi
-
 #create a project name for the docker-compose based on the image name.
-if [[ -z ${PROJECT_NAME} ]]
-then
-   PROJECT_NAME=`echo ${IMAGE}|sed -r 's|\w+/||'|sed 's/:/_/'`
+if [[ -z ${PROJECT} ]]; then
+   PROJECT=`echo ${IMAGE}|sed -r 's|\w+/||'|sed 's/:/_/'`
 fi
-echo ${PROJECT_NAME}
-echo -e "Starting ${PRODUCT} using: \n\t${IMAGE}"
 
-if [[ -z ${VOLUME_MOUNT} ]]
-then
-   echo -e "\tUsing docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT_NAME} -f - ${ACTION}"
-   docker-app render ${IMAGE} ${ARGS}| docker-compose -p ${PROJECT_NAME} -f - ${ACTION}
-else
-   # To-Do
-   # think of a better way to provide this capability
-   echo -e "\tUsing docker-app render ${IMAGE} ${ARGS} | sed -e '\$a\    - ${HOME}/.m2:/home/demo/.m2' -e '\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects' |  docker-compose -p ${PROJECT_NAME} -f - up -d"
-   docker-app render ${IMAGE} ${ARGS}| sed -e "\$a\    - ${HOME}/.m2:/home/demo/.m2" -e "\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects" | docker-compose -p ${PROJECT_NAME} -f - ${ACTION}
+#Build Command
+if [[ $ACTION == "inspect" ]]; then
+    DOCKERAPP_ACTION="inspect"
+    ISDOCKERAPPACTION=0
+elif [[ $ACTION == "render" ]]; then
+    ISDOCKERAPPACTION=0
 fi
+
+COMMAND="docker-app ${DOCKERAPP_ACTION}"
+
+if [[ ! ${ARGS} == "" ]]; then
+    COMMAND="${COMMAND} ${ARGS}"
+fi
+
+COMMAND="${COMMAND} ${REPOSITORY}/${IMAGE}:${VERSION}"
+
+if [[ ${ISDOCKERAPPACTION} -eq 1 ]] ; then
+    if [[ -z ${VOLUME_MOUNT} ]]; then
+        COMMAND="${COMMAND} | docker-compose -p ${PROJECT} -f - ${ACTION} $@"
+    else
+       # TODO: think of a better way to provide this capability
+       COMMAND="${COMMAND} | sed -e "\$a\    - ${HOME}/.m2:/home/demo/.m2" -e "\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects" | docker-compose -p ${PROJECT} -f - ${ACTION} $@"
+    fi
+fi
+
+echo -e "Running ${COMMAND}"
+eval ${COMMAND}
