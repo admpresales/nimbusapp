@@ -19,8 +19,10 @@ function usage()
    echo -e "  inspect  Shows metadata and settings for a given application"
    echo -e "  logs     Shows logs for containers"
    echo -e "  ps       Lists containers"
+   echo -e "  pull     Pull service images"
    echo -e "  render   Render the Compose file for the application"
    echo -e "  rm       Remove stopped containers"
+   echo -e "  restart  Restart containers"
    echo -e "  start    Start existing containers"
    echo -e "  stop     Stop existing containers"
    echo -e "  up       Creates and start containers"
@@ -86,11 +88,11 @@ while [[ "$1" != "" ]]; do
   PARAM=$1
   VALUE=$2
   case $PARAM in
-    -h | --help)
+    -h | --help | help)
       usage
       exit 0
       ;;
-      -s)
+      -s | --set)
          ARGS="${ARGS} $1 $2"
          shift
          shift
@@ -117,7 +119,7 @@ while [[ "$1" != "" ]]; do
         shift
         break
         ;;
-      down | start | stop | ps | rm | render | inspect | logs )
+      down | start | stop | ps | rm | render | inspect | logs | restart | pull )
         ACTION="${PARAM}"
         shift
         break
