@@ -28,9 +28,9 @@ function usage()
 
 function product_exists(){
    #if we find an entry, return 0 for success, else 1 for failure
-   #will accept the full docker app name or short name without extention
-   if [[ $(grep "^${IMAGE}.dockerapp" ${ENV_FILE} | wc -l) -eq 1 ||
-         $(grep "^${IMAGE}" ${ENV_FILE} | wc -l) -eq 1 ]]
+   #forcing a short name standard since someone could pass intellij or intellij.dockerapp
+   image=$(echo $IMAGE | cut -d'.' -f1 )
+   if [[ $(grep "^${image}" ${ENV_FILE} | wc -l) -eq 1 ]]
    then
       return 0
    else
@@ -41,7 +41,6 @@ function product_exists(){
 # create folders to use for mount points
 # currently not leverated by Intellij
 function create_intellij_mount_points (){
-   IDEA="IdeaProjects_docker"
    # if the folder doesn't exist, create it so it is owned by the user
    if [ ! -d "${HOME}/${IDEA}" ]
    then
@@ -61,6 +60,7 @@ ACTION=""
 VOLUME_MOUNT=""
 ISDOCKERAPPACTION=1
 DOCKERAPP_ACTION="render"
+IDEA="IdeaProjects_docker"
 
 IMAGE=$1
 shift
@@ -76,9 +76,17 @@ fi
 if [[ "$IMAGE" == *:* ]]; then
   VERSION=$(echo $IMAGE | cut -d':' -f2 )
   IMAGE=$(echo $IMAGE | cut -d':' -f1 )
-elif [[ -e $ENV_FILE && ($(product_exists) -eq 0) ]]; then
-  VERSION=$(grep "^${IMAGE}.dockerapp" ${ENV_FILE} | cut -d':' -f2 )
-  echo "Using ${IMAGE} version found in ${ENV_FILE}: ${VERSION}"
+elif [[ -e $ENV_FILE ]]; then
+  product_exists
+  prodExists=$?
+  if [[ $prodExists -eq 0 ]]; then
+    #ensuring uniform comparision since someone could pass intillij or intellij.dockerapp
+    image=$(echo $IMAGE | cut -d'.' -f1 )
+    VERSION=$(grep "^${image}.dockerapp" ${ENV_FILE} | cut -d':' -f2 )
+    echo "Using ${IMAGE} version found in ${ENV_FILE}: ${VERSION}"
+  else
+    echo "Not able to find ${IMAGE} in ${ENV_FILE}.  Will attempt to start using ${IMAGE}:${VERSION}"
+  fi
 fi
 
 # IMAGE="admpresales/${IMAGE}.dockerapp"
@@ -97,9 +105,8 @@ while [[ "$1" != "" ]]; do
          shift
          ;;
       -v)
-         # check to see if intellij is being called.  since args can appear in differ order, checking all 3 places:
-         # product, image or if it is a command not yet processed
-         if [[ (`echo ${PRODUCT}|grep "intellij"| wc -l` -eq 1) || (`echo ${IMAGE}|grep "intellij"| wc -l` -eq 1) || (`echo "$@" |grep "intellij"| wc -l` -eq 1)]]
+         # check to see if intellij is being called.
+         if [[ `echo ${IMAGE}|grep -w "intellij"| wc -l` -eq 1 ]]
          then
             VOLUME_MOUNT="-e '\$a\    - ${HOME}/.m2:/home/demo/.m2' -e '\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects'"
             create_intellij_mount_points
