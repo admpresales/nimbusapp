@@ -81,9 +81,9 @@ elif [[ -e $ENV_FILE ]]; then
   prodExists=$?
   if [[ $prodExists -eq 0 ]]; then
     #ensuring uniform comparision since someone could pass intillij or intellij.dockerapp
-    image=$(echo $IMAGE | cut -d'.' -f1 )
-    VERSION=$(grep "^${image}.dockerapp" ${ENV_FILE} | cut -d':' -f2 )
-    echo "Using ${IMAGE} version found in ${ENV_FILE}: ${VERSION}"
+    IMAGE=$(echo $IMAGE | cut -d'.' -f1 )".dockerapp"
+    VERSION=$(grep "^${IMAGE}" ${ENV_FILE} | cut -d':' -f2 )
+    echo "Using ${IMAGE}:${VERSION} version found in ${ENV_FILE}"
   else
     echo "Not able to find ${IMAGE} in ${ENV_FILE}.  Will attempt to start using ${IMAGE}:${VERSION}"
   fi
@@ -163,7 +163,6 @@ if [[ ! ${ARGS} == "" ]]; then
 fi
 
 COMMAND="${COMMAND} ${REPOSITORY}/${IMAGE}:${VERSION}"
-
 if [[ ${ISDOCKERAPPACTION} -eq 1 ]] ; then
     if [[ -z ${VOLUME_MOUNT} ]]; then
         COMMAND="${COMMAND} | docker-compose -p ${PROJECT} -f - ${ACTION} $@"
@@ -174,4 +173,4 @@ if [[ ${ISDOCKERAPPACTION} -eq 1 ]] ; then
 fi
 
 echo -e "Running ${COMMAND}"
-#eval ${COMMAND}
+eval ${COMMAND}
