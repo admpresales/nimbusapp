@@ -28,8 +28,9 @@ function usage()
 
 function product_exists(){
    #if we find an entry, return 0 for success, else 1 for failure
-   echo
-   if [[ $(grep ${REPOSITORY}/${IMAGE}.dockerapp ${ENV_FILE} | wc -l) -eq 1 ]]
+   #will accept the full docker app name or short name without extention
+   if [[ $(grep "^${IMAGE}.dockerapp" ${ENV_FILE} | wc -l) -eq 1 ||
+         $(grep "^${IMAGE}" ${ENV_FILE} | wc -l) -eq 1 ]]
    then
       return 0
    else
@@ -75,9 +76,9 @@ fi
 if [[ "$IMAGE" == *:* ]]; then
   VERSION=$(echo $IMAGE | cut -d':' -f2 )
   IMAGE=$(echo $IMAGE | cut -d':' -f1 )
-elif [[ -e $ENV_FILE && $(product_exists) -eq 0 ]]; then
-  VERSION=$(grep ${REPOSITORY}/${IMAGE}.dockerapp ${ENV_FILE} | cut -d':' -f2 )
-  echo "Using version in ${ENV_FILE}: ${VERSION}"
+elif [[ -e $ENV_FILE && ($(product_exists) -eq 0) ]]; then
+  VERSION=$(grep "^${IMAGE}.dockerapp" ${ENV_FILE} | cut -d':' -f2 )
+  echo "Using ${IMAGE} version found in ${ENV_FILE}: ${VERSION}"
 fi
 
 # IMAGE="admpresales/${IMAGE}.dockerapp"
@@ -166,4 +167,4 @@ if [[ ${ISDOCKERAPPACTION} -eq 1 ]] ; then
 fi
 
 echo -e "Running ${COMMAND}"
-eval ${COMMAND}
+#eval ${COMMAND}
