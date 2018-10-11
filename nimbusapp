@@ -110,7 +110,7 @@ while [[ "$1" != "" ]]; do
          # check to see if intellij is being called.
          if [[ $(echo ${IMAGE}|grep -w "intellij"| wc -l) -eq 1 ]]
          then
-            # the \ \ forces a space which is needed for the sed statment below so the docker-compose format is matched
+            # the \ \ forces spaces which are needed for the sed statment below for proper docker-compose format
             VOLUME_MOUNT_IDEA="\ \ \ \ - type: bind\n\ \ \ \ \ \ source: ${HOME}\/${IDEA}\n\ \ \ \ \ \ target: \/home\/demo/\/IdeaProjects"
             create_intellij_mount_points
          else
@@ -122,7 +122,7 @@ while [[ "$1" != "" ]]; do
          # check to see if intellij is being called.
          if [[ $(echo ${IMAGE}|grep -w "intellij"| wc -l) -eq 1 ]]
          then
-            # the \ \ forces a space which is needed for the sed statment below so the docker-compose format is matched
+            # the \ \ forces spaces which are needed for the sed statment below for proper docker-compose format
             VOLUME_MOUNT_M2="\ \ \ \ - type: bind\n\ \ \ \ \ \ source: ${HOME}\/\.m2\n\ \ \ \ \ \ target: \/home\/demo\/\.m2"
             create_intellij_mount_points
             echo "Not implemented at this time."
