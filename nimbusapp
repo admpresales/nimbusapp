@@ -125,7 +125,6 @@ while [[ "$1" != "" ]]; do
             # the \ \ forces spaces which are needed for the sed statment below for proper docker-compose format
             VOLUME_MOUNT_M2="\ \ \ \ - type: bind\n\ \ \ \ \ \ source: ${HOME}\/\.m2\n\ \ \ \ \ \ target: \/home\/demo\/\.m2"
             create_intellij_mount_points
-            echo "Not implemented at this time."
          else
             echo "The '-m' option is only available with Intellij at this time.  Ignoring."
          fi
@@ -180,13 +179,21 @@ fi
 
 COMMAND="${COMMAND} ${REPOSITORY}/${IMAGE}:${VERSION}"
 if [[ ${ISDOCKERAPPACTION} -eq 1 ]] ; then
-    if [[ -z ${VOLUME_MOUNT_IDEA} ]]; then
-        COMMAND="${COMMAND} | docker-compose -p ${PROJECT} -f - ${ACTION} $@"
-    else
-       # TODO: think of a better way to provide this capability
-       #sed expression -e searches for volumes: and then appends on a new line the volume mount information
-       COMMAND="${COMMAND}|sed -e \"/volumes:/a ${VOLUME_MOUNT_IDEA}\"| docker-compose -p ${PROJECT} -f - ${ACTION} $@"
-    fi
+   #if using either volume mounts else process normally
+   if [[ ! -z ${VOLUME_MOUNT_IDEA} || ! -z ${VOLUME_MOUNT_M2} ]]; then
+      tmp=""
+      # TODO: think of a better way to provide this capability
+      #sed expression -e searches for volumes: and then appends on a new line the volume mount information
+      if [[ ! -z ${VOLUME_MOUNT_IDEA} ]]; then
+         tmp=${tmp}"sed -e \"/volumes:/a ${VOLUME_MOUNT_IDEA}\"|"
+      fi
+      if [[ ! -z ${VOLUME_MOUNT_M2} ]]; then
+         tmp=${tmp}"sed -e \"/volumes:/a ${VOLUME_MOUNT_M2}\"|"
+      fi
+      COMMAND="${COMMAND}|${tmp} docker-compose -p ${PROJECT} -f - ${ACTION} $@"
+   else
+      COMMAND="${COMMAND} | docker-compose -p ${PROJECT} -f - ${ACTION} $@"
+   fi
 fi
 
 echo -e "Running ${COMMAND}"
