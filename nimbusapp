@@ -11,7 +11,8 @@ function usage()
    echo -e "             dockerapp is added if not explicitly stated."
    echo -e "  VERSION    The version of the Docker App file you wish to run."
    echo -e "  -s, --set  Enables you to set(override) default arguments"
-   echo -e "  -v         Volume mounts .m2 and IdeaProject for access from the NimbusServer - EXPERIMENTAL NOT FOR CASUAL USERS"
+   echo -e "  -v         Mounts volume for IdeaProject in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS"
+   echo -e "  -m         Mounts volume for .m2 in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS"
    echo -e "  -p         Docker-compose project name to use - EXPERIMENTAL NOT RECOMMENDED FOR CASUAL USERS"
    echo -e ""
    echo -e "Commands:"
@@ -59,7 +60,8 @@ REPOSITORY=admpresales
 VERSION="latest"
 PROJECT=""
 ACTION=""
-VOLUME_MOUNT=""
+VOLUME_MOUNT_IDEA=""
+VOLUME_MOUNT_M2=""
 ISDOCKERAPPACTION=1
 DOCKERAPP_ACTION="render"
 IDEA="IdeaProjects_docker"
@@ -108,12 +110,25 @@ while [[ "$1" != "" ]]; do
          ;;
       -v)
          # check to see if intellij is being called.
-         if [[ `echo ${IMAGE}|grep -w "intellij"| wc -l` -eq 1 ]]
+         if [[ $(echo ${IMAGE}|grep -w "intellij"| wc -l) -eq 1 ]]
          then
-            VOLUME_MOUNT="-e '\$a\    - ${HOME}/.m2:/home/demo/.m2' -e '\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects'"
+            # the \ \ forces spaces which are needed for the sed statment below for proper docker-compose format
+            VOLUME_MOUNT_IDEA="\ \ \ \ - type: bind\n\ \ \ \ \ \ source: ${HOME}\/${IDEA}\n\ \ \ \ \ \ target: \/home\/demo/\/IdeaProjects"
             create_intellij_mount_points
          else
             echo "The '-v' option is only available with Intellij at this time.  Ignoring."
+         fi
+         shift
+         ;;
+      -m)
+         # check to see if intellij is being called.
+         if [[ $(echo ${IMAGE}|grep -w "intellij"| wc -l) -eq 1 ]]
+         then
+            # the \ \ forces spaces which are needed for the sed statment below for proper docker-compose format
+            VOLUME_MOUNT_M2="\ \ \ \ - type: bind\n\ \ \ \ \ \ source: ${HOME}\/\.m2\n\ \ \ \ \ \ target: \/home\/demo\/\.m2"
+            create_intellij_mount_points
+         else
+            echo "The '-m' option is only available with Intellij at this time.  Ignoring."
          fi
          shift
          ;;
@@ -166,12 +181,21 @@ fi
 
 COMMAND="${COMMAND} ${REPOSITORY}/${IMAGE}:${VERSION}"
 if [[ ${ISDOCKERAPPACTION} -eq 1 ]] ; then
-    if [[ -z ${VOLUME_MOUNT} ]]; then
-        COMMAND="${COMMAND} | docker-compose -p ${PROJECT} -f - ${ACTION} $@"
-    else
-       # TODO: think of a better way to provide this capability
-       COMMAND="${COMMAND} | sed -e "\$a\    - ${HOME}/.m2:/home/demo/.m2" -e "\$a\    - ${HOME}/${IDEA}:/home/demo/IdeaProjects" | docker-compose -p ${PROJECT} -f - ${ACTION} $@"
-    fi
+   #if using either volume mounts else process normally
+   if [[ ! -z ${VOLUME_MOUNT_IDEA} || ! -z ${VOLUME_MOUNT_M2} ]]; then
+      tmp=""
+      # TODO: think of a better way to provide this capability
+      #sed expression -e searches for volumes: and then appends on a new line the volume mount information
+      if [[ ! -z ${VOLUME_MOUNT_IDEA} ]]; then
+         tmp=${tmp}"sed -e \"/volumes:/a ${VOLUME_MOUNT_IDEA}\"|"
+      fi
+      if [[ ! -z ${VOLUME_MOUNT_M2} ]]; then
+         tmp=${tmp}"sed -e \"/volumes:/a ${VOLUME_MOUNT_M2}\"|"
+      fi
+      COMMAND="${COMMAND}|${tmp} docker-compose -p ${PROJECT} -f - ${ACTION} $@"
+   else
+      COMMAND="${COMMAND} | docker-compose -p ${PROJECT} -f - ${ACTION} $@"
+   fi
 fi
 
 echo -e "Running ${COMMAND}"
