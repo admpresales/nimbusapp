@@ -12,7 +12,7 @@ function usage()
    echo -e "  VERSION    The version of the Docker App file you wish to run."
    echo -e "  -s, --set  Enables you to set(override) default arguments"
    echo -e "  -v         Mounts volume for IdeaProject in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS"
-   echo -e "  -m         Mounts volume for IdeaProject in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS"
+   echo -e "  -m         Mounts volume for .m2 in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS"
    echo -e "  -p         Docker-compose project name to use - EXPERIMENTAL NOT RECOMMENDED FOR CASUAL USERS"
    echo -e ""
    echo -e "Commands:"
