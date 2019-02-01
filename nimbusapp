@@ -104,7 +104,7 @@ while [[ "$1" != "" ]]; do
       exit 0
       ;;
       -s | --set)
-         ARGS="${ARGS} $1 $2"
+         ARGS="${ARGS} \"$1 $2\""
          shift
          shift
          ;;
