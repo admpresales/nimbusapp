@@ -45,33 +45,61 @@ function product_exists(){
 # currently not leverated by Intellij
 function create_intellij_mount_points (){
    # if the folder doesn't exist, create it so it is owned by the user
-   if [ ! -d "${HOME}/${IDEA}" ]
+   if [[ ! -d "${HOME}/${IDEA}" ]]
    then
       mkdir ${HOME}/${IDEA}
    fi
 
-   if [ ! -d "${HOME}/.m2" ]
+   if [[ ! -d "${HOME}/.m2" ]]
    then
       mkdir ${HOME}/.m2
    fi
 }
 
-REPOSITORY=admpresales
+function prompt_yn() {
+  local PROMPT_TEXT="${1-Continue?} [y/n] "
+  local USER_ANSWER
+
+  echo -n ${PROMPT_TEXT}
+
+  while read USER_ANSWER; do
+    case "${USER_ANSWER}" in
+      [yY]*)
+        return 0
+        ;;
+      [nN]*)
+        return 1
+        ;;
+    esac
+
+    echo -n ${PROMPT_TEXT}
+  done
+}
+
+REPOSITORY="admpresales"
 VERSION="latest"
 PROJECT=""
-ACTION=""
 VOLUME_MOUNT_IDEA=""
 VOLUME_MOUNT_M2=""
-ISDOCKERAPPACTION=1
-DOCKERAPP_ACTION="render"
 IDEA="IdeaProjects_docker"
 
-IMAGE=$1
+COMPOSE_COMMAND="docker-compose"
+COMPOSE_ACTION=""
+COMPOSE_ARGS=""
+
+DOCKERAPP_FORCE=""
+DOCKERAPP_COMMAND="docker-app"
+DOCKERAPP_ACTION=""
+DOCKERAPP_ARGS=""
+
+IMAGE="$1"
+
 shift
-if [[ $IMAGE = *"help"* ]]; then
+if [[ "${IMAGE}" = *"help"* ]]; then
   usage
   exit 0
 fi
+
 if [[ "$IMAGE" == *\/* ]]; then
   REPOSITORY=$(echo $IMAGE | cut -d'/' -f1 )
   IMAGE=$(echo $IMAGE | cut -d'/' -f2 )
@@ -96,21 +124,24 @@ fi
 # IMAGE="admpresales/${IMAGE}.dockerapp"
 
 while [[ "$1" != "" ]]; do
-  PARAM=$1
-  VALUE=$2
-  case $PARAM in
+  PARAM="$1"
+  VALUE="$2"
+
+  case "$PARAM" in
     -h | --help | help)
       usage
       exit 0
       ;;
       -s | --set)
-         ARGS="${ARGS} \"$1 $2\""
+         DOCKERAPP_FORCE="force"
+         DOCKERAPP_ARGS="${DOCKERAPP_ARGS} $PARAM $VALUE"
          shift
          shift
          ;;
       -v)
          # check to see if intellij is being called.
-         if [[ $(echo ${IMAGE}|grep -w "intellij"| wc -l) -eq 1 ]]
+         DOCKERAPP_FORCE="force"
+        if [[ "${IMAGE}" == *intellij* ]]
          then
             # the \ \ forces spaces which are needed for the sed statment below for proper docker-compose format
             VOLUME_MOUNT_IDEA="\ \ \ \ - type: bind\n\ \ \ \ \ \ source: ${HOME}\/${IDEA}\n\ \ \ \ \ \ target: \/home\/demo/\/IdeaProjects"
@@ -122,7 +153,8 @@ while [[ "$1" != "" ]]; do
          ;;
       -m)
          # check to see if intellij is being called.
-         if [[ $(echo ${IMAGE}|grep -w "intellij"| wc -l) -eq 1 ]]
+         DOCKERAPP_FORCE="force"
+         if [[ "${IMAGE}" == *"intellij"* ]]
          then
             # the \ \ forces spaces which are needed for the sed statment below for proper docker-compose format
             VOLUME_MOUNT_M2="\ \ \ \ - type: bind\n\ \ \ \ \ \ source: ${HOME}\/\.m2\n\ \ \ \ \ \ target: \/home\/demo\/\.m2"
@@ -133,28 +165,35 @@ while [[ "$1" != "" ]]; do
          shift
          ;;
       -p)
-         PROJECT=$2
+         PROJECT="${VALUE}"
          shift
          shift
          ;;
-      up)
-        ACTION="up -d"
+      render|inspect)
+        DOCKERAPP_ACTION="${PARAM}"
         shift
         break
         ;;
-      down | start | stop | ps | rm | render | inspect | logs | restart | pull )
-        ACTION="${PARAM}"
+      down | start | stop | ps | rm | logs | restart | pull )
+        DOCKERAPP_ACTION="render"
+        COMPOSE_ACTION="${PARAM}"
+        shift
+        break
+        ;;
+      up)
+        DOCKERAPP_ACTION="render"
+        COMPOSE_ACTION="up -d"
         shift
         break
         ;;
       *)
-       echo "Invalid agument passed: $1"
+       echo "Invalid argument passed: $1"
        usage
-     exit 1
+       exit 1
    esac
 done
 
-if [[ -z ${ACTION} ]]; then
+if [[ -z "${COMPOSE_ACTION}" -a -z "${DOCKERAPP_ACTION}" ]]; then
    echo "You must specify a command"
    usage
    exit 1
@@ -165,38 +204,43 @@ if [[ -z ${PROJECT} ]]; then
    PROJECT=`echo ${IMAGE}|sed -r 's|\w+/||'|sed 's/:/_/'`
 fi
 
-#Build Command
-if [[ $ACTION == "inspect" ]]; then
-    DOCKERAPP_ACTION="inspect"
-    ISDOCKERAPPACTION=0
-elif [[ $ACTION == "render" ]]; then
-    ISDOCKERAPPACTION=0
+COMPOSE_ARGS="$@"
+COMPOSE_DIR="${HOME}/.nimbusapp/cache/${PROJECT}/${REPOSITORY}/${IMAGE}/${VERSION}"
+COMPOSE_FILE="${COMPOSE_DIR}/${IMAGE}.yml"
+
+# Use cached version
+if [[ -z "${DOCKERAPP_FORCE}" -a -n "${COMPOSE_ACTION}" -a -f "${COMPOSE_FILE}" ]]; then
+    DOCKERAPP_ACTION=""
+    echo "Using cached compose file: ${COMPOSE_FILE}"
 fi
 
-COMMAND="docker-app ${DOCKERAPP_ACTION}"
+if [[ -n "${DOCKERAPP_ACTION}" ]]; then
+  if [[ -f "${COMPOSE_FILE}" ]]; then
+    echo "Cached file ${COMPOSE_FILE} will be re-created from Docker Hub"
 
-if [[ ! ${ARGS} == "" ]]; then
-    COMMAND="${COMMAND} ${ARGS}"
-fi
+    if ! prompt_yn "Proceed?"; then
+      echo "Exiting"
+      exit 1
+      fi
+   fi
 
-COMMAND="${COMMAND} ${REPOSITORY}/${IMAGE}:${VERSION}"
-if [[ ${ISDOCKERAPPACTION} -eq 1 ]] ; then
-   #if using either volume mounts else process normally
-   if [[ ! -z ${VOLUME_MOUNT_IDEA} || ! -z ${VOLUME_MOUNT_M2} ]]; then
-      tmp=""
-      # TODO: think of a better way to provide this capability
-      #sed expression -e searches for volumes: and then appends on a new line the volume mount information
-      if [[ ! -z ${VOLUME_MOUNT_IDEA} ]]; then
-         tmp=${tmp}"sed -e \"/volumes:/a ${VOLUME_MOUNT_IDEA}\"|"
-      fi
-      if [[ ! -z ${VOLUME_MOUNT_M2} ]]; then
-         tmp=${tmp}"sed -e \"/volumes:/a ${VOLUME_MOUNT_M2}\"|"
-      fi
-      COMMAND="${COMMAND}|${tmp} docker-compose -p ${PROJECT} -f - ${ACTION} $@"
-   else
-      COMMAND="${COMMAND} | docker-compose -p ${PROJECT} -f - ${ACTION} $@"
+   DOCKERAPP_COMMAND="${DOCKERAPP_COMMAND} ${DOCKERAPP_ACTION} ${DOCKERAPP_ARGS} ${REPOSITORY}/${IMAGE}:${VERSION} > ${COMPOSE_FILE}"
+   echo "Running: ${DOCKERAPP_COMMAND}"
+   eval "${DOCKERAPP_COMMAND}"
+
+   if [[ -n "${VOLUME_MOUNT_IDEA}" ]]; then
+      echo "Mounting IDEA: ${VOLUME_MOUNT_IDEA}"
+      sed -i "/volumes:/a ${VOLUME_MOUNT_IDEA}" "${COMPOSE_FILE}"
+   fi
+
+   if [[ -n "${VOLUME_MOUNT_M2}" ]]; then
+      echo "Mounting M2: ${VOLUME_MOUNT_M2}"
+      sed -i "/volumes:/a ${VOLUME_MOUNT_M2}" "${COMPOSE_FILE}"
    fi
 fi
 
-echo -e "Running ${COMMAND}"
-eval ${COMMAND}
+if [[ -n "${COMPOSE_ACTION}" ]]; then
+  COMPOSE_COMMAND="${COMPOSE_COMMAND} -p ${PROJECT} -f ${COMPOSE_FILE} ${COMPOSE_ACTION} ${COMPOSE_ARGS}"
+  echo "Running: ${COMPOSE_COMMAND}"
+  eval "${COMPOSE_COMMAND}"
+fi
