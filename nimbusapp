@@ -1,7 +1,5 @@
 #!/bin/bash
 
-ENV_FILE="${HOME}/.nimbusapp/apps.config"
-
 function usage()
 {
    echo "Usage: nimbusapp <IMAGE>:<VERSION> [OPTIONS] COMMAND"
@@ -57,10 +55,10 @@ function create_intellij_mount_points (){
 }
 
 function prompt_yn() {
-  local PROMPT_TEXT="${1-Continue?} [y/n] "
+  local PROMPT_TEXT=$"${1-Continue?} [y/n]"
   local USER_ANSWER
 
-  echo -n ${PROMPT_TEXT}
+  echo -n "${PROMPT_TEXT} "
 
   while read USER_ANSWER; do
     case "${USER_ANSWER}" in
@@ -72,7 +70,7 @@ function prompt_yn() {
         ;;
     esac
 
-    echo -n ${PROMPT_TEXT}
+    echo -n "${PROMPT_TEXT} "
   done
 }
 
@@ -83,14 +81,19 @@ VOLUME_MOUNT_IDEA=""
 VOLUME_MOUNT_M2=""
 IDEA="IdeaProjects_docker"
 
-COMPOSE_COMMAND="docker-compose"
+COMPOSE_COMMAND="${NIMBUS_COMPOSE_COMMAND-docker-compose}"
 COMPOSE_ACTION=""
-COMPOSE_ARGS=""
+COMPOSE_ARGS="${NIMBUS_COMPOSE_ARGS}"
 
-DOCKERAPP_FORCE=""
-DOCKERAPP_COMMAND="docker-app"
+DOCKERAPP_COMMAND="${NIMBUS_DOCKERAPP_COMMAND-docker-app}"
 DOCKERAPP_ACTION=""
-DOCKERAPP_ARGS=""
+DOCKERAPP_ARGS="${NIMBUS_DOCKERAPP_ARGS}"
+
+NIMBUS_BASEDIR="${NIMBUS_BASEDIR-$HOME/.nimbusapp}"
+NIMBUS_DOCKERHUB_URL="${NIMBUS_DOCKERHUB_URL-https://hub.docker.com}"
+NIMBUS_DOCKERHUB_TIMEOUT="${NIMBUS_DOCKERHUB_TIMEOUT-10}"
+
+ENV_FILE="${NIMBUS_BASEDIR}/apps.config"
 
 IMAGE="$1"
 
@@ -133,14 +136,12 @@ while [[ "$1" != "" ]]; do
       exit 0
       ;;
       -s | --set)
-         DOCKERAPP_FORCE="force"
          DOCKERAPP_ARGS="${DOCKERAPP_ARGS} $PARAM $VALUE"
          shift
          shift
          ;;
       -v)
          # check to see if intellij is being called.
-         DOCKERAPP_FORCE="force"
         if [[ "${IMAGE}" == *intellij* ]]
          then
             # the \ \ forces spaces which are needed for the sed statment below for proper docker-compose format
@@ -153,7 +154,6 @@ while [[ "$1" != "" ]]; do
          ;;
       -m)
          # check to see if intellij is being called.
-         DOCKERAPP_FORCE="force"
          if [[ "${IMAGE}" == *"intellij"* ]]
          then
             # the \ \ forces spaces which are needed for the sed statment below for proper docker-compose format
@@ -193,7 +193,7 @@ while [[ "$1" != "" ]]; do
    esac
 done
 
-if [[ -z "${COMPOSE_ACTION}" -a -z "${DOCKERAPP_ACTION}" ]]; then
+if [[ -z "${COMPOSE_ACTION}" && -z "${DOCKERAPP_ACTION}" ]]; then
    echo "You must specify a command"
    usage
    exit 1
@@ -207,36 +207,61 @@ fi
 COMPOSE_ARGS="$@"
 COMPOSE_DIR="${HOME}/.nimbusapp/cache/${PROJECT}/${REPOSITORY}/${IMAGE}/${VERSION}"
 COMPOSE_FILE="${COMPOSE_DIR}/${IMAGE}.yml"
-
-# Use cached version
-if [[ -z "${DOCKERAPP_FORCE}" -a -n "${COMPOSE_ACTION}" -a -f "${COMPOSE_FILE}" ]]; then
-    DOCKERAPP_ACTION=""
-    echo "Using cached compose file: ${COMPOSE_FILE}"
-fi
+COMPOSE_BACKUP="${COMPOSE_FILE}.bk"
 
 if [[ -n "${DOCKERAPP_ACTION}" ]]; then
-  if [[ -f "${COMPOSE_FILE}" ]]; then
-    echo "Cached file ${COMPOSE_FILE} will be re-created from Docker Hub"
+   if curl -s --connect-timeout "${NIMBUS_DOCKERHUB_TIMEOUT}" "${NIMBUS_DOCKERHUB_URL}" > /dev/null 2>&1; then
+       DOCKERAPP_COMMAND="${DOCKERAPP_COMMAND} ${DOCKERAPP_ACTION} ${DOCKERAPP_ARGS} ${REPOSITORY}/${IMAGE}:${VERSION}"
 
-    if ! prompt_yn "Proceed?"; then
-      echo "Exiting"
-      exit 1
-      fi
-   fi
+       if [[ "$DOCKERAPP_ACTION" == "render" ]]; then
+          DOCKERAPP_COMMAND="${DOCKERAPP_COMMAND} > ${COMPOSE_FILE}"
 
-   DOCKERAPP_COMMAND="${DOCKERAPP_COMMAND} ${DOCKERAPP_ACTION} ${DOCKERAPP_ARGS} ${REPOSITORY}/${IMAGE}:${VERSION} > ${COMPOSE_FILE}"
-   echo "Running: ${DOCKERAPP_COMMAND}"
-   eval "${DOCKERAPP_COMMAND}"
+          # Backup previous successful attempts in case this try fails
+          # Ignore empty files (assume previous failure)
+          if [[ -s "${COMPOSE_FILE}" ]]; then
+            mv -v "${COMPOSE_FILE}" "${COMPOSE_BACKUP}"
+          else
+            rm -vf "${COMPOSE_FILE}"
+          fi
+       fi # action == render
 
-   if [[ -n "${VOLUME_MOUNT_IDEA}" ]]; then
-      echo "Mounting IDEA: ${VOLUME_MOUNT_IDEA}"
-      sed -i "/volumes:/a ${VOLUME_MOUNT_IDEA}" "${COMPOSE_FILE}"
-   fi
+       mkdir -p "${COMPOSE_DIR}"
 
-   if [[ -n "${VOLUME_MOUNT_M2}" ]]; then
-      echo "Mounting M2: ${VOLUME_MOUNT_M2}"
-      sed -i "/volumes:/a ${VOLUME_MOUNT_M2}" "${COMPOSE_FILE}"
-   fi
+       echo
+       echo "Running: ${DOCKERAPP_COMMAND}"
+
+       if ! eval "${DOCKERAPP_COMMAND}"; then
+          # Something went wrong, replace the compose backup
+          if [[ -f "${COMPOSE_BACKUP}" ]]; then
+            mv "${COMPOSE_BACKUP}" "${COMPOSE_FILE}"
+          fi
+
+          echo "ERROR: Could not render" >&2
+          exit 1
+       fi # eval
+
+       if [[ -n "${VOLUME_MOUNT_IDEA}" ]]; then
+         echo "Mounting IDEA: ${VOLUME_MOUNT_IDEA}"
+         sed -i "/volumes:/a ${VOLUME_MOUNT_IDEA}" "${COMPOSE_FILE}"
+       fi
+
+       if [[ -n "${VOLUME_MOUNT_M2}" ]]; then
+         echo "Mounting M2: ${VOLUME_MOUNT_M2}"
+         sed -i "/volumes:/a ${VOLUME_MOUNT_M2}" "${COMPOSE_FILE}"
+       fi
+
+
+       if [[ "$DOCKERAPP_ACTION" == "render" && -z "${COMPOSE_ACTION}" ]]; then
+          cat "${COMPOSE_FILE}"
+       fi
+   else # curl check
+       if [[ ! -f "${COMPOSE_FILE}" ]]; then
+          echo "ERROR: No connection to Docker Hub: ${NIMBUS_DOCKERHUB_URL} (${NIMBUS_DOCKERHUB_TIMEOUT}s)" >&2
+          exit 1
+       else
+          echo "No connection to Docker Hub (${NIMBUS_DOCKERHUB_URL}), using cached file: ${COMPOSE_FILE}" >&2
+       fi
+   fi # curl check
 fi
 
 if [[ -n "${COMPOSE_ACTION}" ]]; then
