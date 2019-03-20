@@ -193,7 +193,7 @@ while [[ "$1" != "" ]]; do
    esac
 done
 
-if [[ -z "${COMPOSE_ACTION}" && -z "${DOCKERAPP_ACTION}" ]]; then
+if [[ -z "${COMPOSE_ACTION}" -a -z "${DOCKERAPP_ACTION}" ]]; then
    echo "You must specify a command"
    usage
    exit 1
@@ -209,7 +209,7 @@ COMPOSE_DIR="${HOME}/.nimbusapp/cache/${PROJECT}/${REPOSITORY}/${IMAGE}/${VERSIO
 COMPOSE_FILE="${COMPOSE_DIR}/${IMAGE}.yml"
 
 # Use cached version
-if [[ -z "${DOCKERAPP_FORCE}" && -n "${COMPOSE_ACTION}" && -f "${COMPOSE_FILE}" ]]; then
+if [[ -z "${DOCKERAPP_FORCE}" -a -n "${COMPOSE_ACTION}" -a -f "${COMPOSE_FILE}" ]]; then
     DOCKERAPP_ACTION=""
     echo "Using cached compose file: ${COMPOSE_FILE}"
 fi
@@ -224,7 +224,6 @@ if [[ -n "${DOCKERAPP_ACTION}" ]]; then
       fi
    fi
 
-   mkdir -vp "${COMPOSE_DIR}"
    DOCKERAPP_COMMAND="${DOCKERAPP_COMMAND} ${DOCKERAPP_ACTION} ${DOCKERAPP_ARGS} ${REPOSITORY}/${IMAGE}:${VERSION} > ${COMPOSE_FILE}"
    echo "Running: ${DOCKERAPP_COMMAND}"
    eval "${DOCKERAPP_COMMAND}"
