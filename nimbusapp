@@ -2,29 +2,30 @@
 
 function usage()
 {
-   echo "Usage: nimbusapp <IMAGE>:<VERSION> [OPTIONS] COMMAND"
-   echo -e ""
-   echo -e "Options:"
-   echo -e "  IMAGE      The Docker App file you wish to run. If no repository is provided, admpresales is assumed."
-   echo -e "             dockerapp is added if not explicitly stated."
-   echo -e "  VERSION    The version of the Docker App file you wish to run."
-   echo -e "  -s, --set  Enables you to set(override) default arguments"
-   echo -e "  -v         Mounts volume for IdeaProject in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS"
-   echo -e "  -m         Mounts volume for .m2 in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS"
-   echo -e "  -p         Docker-compose project name to use - EXPERIMENTAL NOT RECOMMENDED FOR CASUAL USERS"
-   echo -e ""
-   echo -e "Commands:"
-   echo -e "  down     Stop and remove containers"
-   echo -e "  inspect  Shows metadata and settings for a given application"
-   echo -e "  logs     Shows logs for containers"
-   echo -e "  ps       Lists containers"
-   echo -e "  pull     Pull service images"
-   echo -e "  render   Render the Compose file for the application"
-   echo -e "  rm       Remove stopped containers"
-   echo -e "  restart  Restart containers"
-   echo -e "  start    Start existing containers"
-   echo -e "  stop     Stop existing containers"
-   echo -e "  up       Creates and start containers"
+   output "Usage: nimbusapp <IMAGE>:<VERSION> [OPTIONS] COMMAND"
+   output -e ""
+   output -e "Options:"
+   output -e "  IMAGE       The Docker App file you wish to run. If no repository is provided, admpresales is assumed."
+   output -e "              dockerapp is added if not explicitly stated."
+   output -e "  VERSION     The version of the Docker App file you wish to run."
+   output -e "  -s, --set   Enables you to set(override) default arguments"
+   output -e "  -v          Mounts volume for IdeaProject in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS"
+   output -e "  -m          Mounts volume for .m2 in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS"
+   output -e "  -p          Docker-compose project name to use - EXPERIMENTAL NOT RECOMMENDED FOR CASUAL USERS"
+   output -e "  -d, --debug Enable debugging output (use twice for verbose bash commands)"
+   output -e ""
+   output -e "Commands:"
+   output -e "  down     Stop and remove containers"
+   output -e "  inspect  Shows metadata and settings for a given application"
+   output -e "  logs     Shows logs for containers"
+   output -e "  ps       Lists containers"
+   output -e "  pull     Pull service images"
+   output -e "  render   Render the Compose file for the application"
+   output -e "  rm       Remove stopped containers"
+   output -e "  restart  Restart containers"
+   output -e "  start    Start existing containers"
+   output -e "  stop     Stop existing containers"
+   output -e "  up       Creates and start containers"
 }
 
 function product_exists(){
@@ -45,12 +46,12 @@ function create_intellij_mount_points (){
    # if the folder doesn't exist, create it so it is owned by the user
    if [[ ! -d "${HOME}/${IDEA}" ]]
    then
-      mkdir ${HOME}/${IDEA}
+      mkdir ${BASH_VERBOSE} ${HOME}/${IDEA}
    fi
 
    if [[ ! -d "${HOME}/.m2" ]]
    then
-      mkdir ${HOME}/.m2
+      mkdir ${BASH_VERBOSE} ${HOME}/.m2
    fi
 }
 
@@ -80,6 +81,20 @@ function create_network() {
     fi
 }
 
+function debug() {
+    if (( NIMBUS_DEBUG > 0 )); then
+        echo $@
+    fi
+}
+
+function output() {
+    if (( NIMBUS_OUTPUT > 0 )); then
+        echo $@
+    fi
+}
+
+BASH_VERBOSE=""
+
 REPOSITORY="admpresales"
 VERSION="latest"
 PROJECT=""
@@ -98,6 +113,8 @@ DOCKERAPP_ARGS="${NIMBUS_DOCKERAPP_ARGS}"
 NIMBUS_BASEDIR="${NIMBUS_BASEDIR-$HOME/.nimbusapp}"
 NIMBUS_DOCKERHUB_URL="${NIMBUS_DOCKERHUB_URL-https://hub.docker.com}"
 NIMBUS_DOCKERHUB_TIMEOUT="${NIMBUS_DOCKERHUB_TIMEOUT-10}"
+NIMBUS_DEBUG=0
+NIMBUS_OUTPUT=1
 
 NETWORK_NAME="${NETWORK_NAME-demo-net}"
 NETWORK_SUBNET="${NETWORK_SUBNET-172.50.0.0/16}"
@@ -128,9 +145,9 @@ elif [[ -e $ENV_FILE ]]; then
     #ensuring uniform comparision since someone could pass intillij or intellij.dockerapp
     IMAGE=$(echo $IMAGE | cut -d'.' -f1 )".dockerapp"
     VERSION=$(grep "^${IMAGE}" ${ENV_FILE} | cut -d':' -f2 )
-    echo "Using ${IMAGE}:${VERSION} version found in ${ENV_FILE}"
+    output "Using ${IMAGE}:${VERSION} version found in ${ENV_FILE}"
   else
-    echo "Not able to find ${IMAGE} in ${ENV_FILE}.  Will attempt to start using ${IMAGE}:${VERSION}"
+    output "Not able to find ${IMAGE} in ${ENV_FILE}.  Will attempt to start using ${IMAGE}:${VERSION}"
   fi
 fi
 
@@ -145,6 +162,13 @@ while [[ "$1" != "" ]]; do
       usage
       exit 0
       ;;
+      -d|--debug)
+        (( NIMBUS_DEBUG++ ))
+        if (( NIMBUS_DEBUG >= 2 )); then
+            BASH_VERBOSE="-v"
+        fi
+        shift
+      ;;
       -s | --set)
          DOCKERAPP_ARGS="${DOCKERAPP_ARGS} $PARAM $VALUE"
          shift
@@ -158,7 +182,7 @@ while [[ "$1" != "" ]]; do
             VOLUME_MOUNT_IDEA="\ \ \ \ - type: bind\n\ \ \ \ \ \ source: ${HOME}\/${IDEA}\n\ \ \ \ \ \ target: \/home\/demo/\/IdeaProjects"
             create_intellij_mount_points
          else
-            echo "The '-v' option is only available with Intellij at this time.  Ignoring."
+            output "The '-v' option is only available with Intellij at this time.  Ignoring."
          fi
          shift
          ;;
@@ -170,7 +194,7 @@ while [[ "$1" != "" ]]; do
             VOLUME_MOUNT_M2="\ \ \ \ - type: bind\n\ \ \ \ \ \ source: ${HOME}\/\.m2\n\ \ \ \ \ \ target: \/home\/demo\/\.m2"
             create_intellij_mount_points
          else
-            echo "The '-m' option is only available with Intellij at this time.  Ignoring."
+            output "The '-m' option is only available with Intellij at this time.  Ignoring."
          fi
          shift
          ;;
@@ -197,14 +221,14 @@ while [[ "$1" != "" ]]; do
         break
         ;;
       *)
-       echo "Invalid argument passed: $1"
+       output "Invalid argument passed: $1"
        usage
        exit 1
    esac
 done
 
 if [[ -z "${COMPOSE_ACTION}" && -z "${DOCKERAPP_ACTION}" ]]; then
-   echo "You must specify a command"
+   output "You must specify a command"
    usage
    exit 1
 fi
@@ -231,34 +255,33 @@ if [[ -n "${DOCKERAPP_ACTION}" ]]; then
           # Backup previous successful attempts in case this try fails
           # Ignore empty files (assume previous failure)
           if [[ -s "${COMPOSE_FILE}" ]]; then
-            mv -v "${COMPOSE_FILE}" "${COMPOSE_BACKUP}"
+            mv ${BASH_VERBOSE} "${COMPOSE_FILE}" "${COMPOSE_BACKUP}"
           else
-            rm -vf "${COMPOSE_FILE}"
+            rm ${BASH_VERBOSE} -f "${COMPOSE_FILE}"
           fi
        fi # action == render
 
-       mkdir -p "${COMPOSE_DIR}"
+       mkdir ${BASH_VERBOSE} -p "${COMPOSE_DIR}"
 
-       echo
-       echo "Running: ${DOCKERAPP_COMMAND}"
+       debug "Running: ${DOCKERAPP_COMMAND}"
 
        if ! eval "${DOCKERAPP_COMMAND}"; then
           # Something went wrong, replace the compose backup
           if [[ -f "${COMPOSE_BACKUP}" ]]; then
-            mv "${COMPOSE_BACKUP}" "${COMPOSE_FILE}"
+            mv -f ${BASH_VERBOSE} "${COMPOSE_BACKUP}" "${COMPOSE_FILE}"
           fi
 
-          echo "ERROR: Could not render" >&2
+          output "ERROR: Could not render" >&2
           exit 1
        fi # eval
 
        if [[ -n "${VOLUME_MOUNT_IDEA}" ]]; then
-         echo "Mounting IDEA: ${VOLUME_MOUNT_IDEA}"
+         debug "Mounting IDEA: ${VOLUME_MOUNT_IDEA}"
          sed -i "/volumes:/a ${VOLUME_MOUNT_IDEA}" "${COMPOSE_FILE}"
        fi
 
        if [[ -n "${VOLUME_MOUNT_M2}" ]]; then
-         echo "Mounting M2: ${VOLUME_MOUNT_M2}"
+         debug "Mounting M2: ${VOLUME_MOUNT_M2}"
          sed -i "/volumes:/a ${VOLUME_MOUNT_M2}" "${COMPOSE_FILE}"
        fi
 
@@ -268,16 +291,18 @@ if [[ -n "${DOCKERAPP_ACTION}" ]]; then
        fi
    else # curl check
        if [[ ! -f "${COMPOSE_FILE}" ]]; then
-          echo "ERROR: No connection to Docker Hub: ${NIMBUS_DOCKERHUB_URL} (${NIMBUS_DOCKERHUB_TIMEOUT}s)" >&2
+          output "ERROR: No connection to Docker Hub: ${NIMBUS_DOCKERHUB_URL} (${NIMBUS_DOCKERHUB_TIMEOUT}s)" >&2
           exit 1
        else
-          echo "No connection to Docker Hub (${NIMBUS_DOCKERHUB_URL}), using cached file: ${COMPOSE_FILE}" >&2
+          output "No connection to Docker Hub, using cached file!"
+          debug "Docker Hub: ${NIMBUS_DOCKERHUB_URL} Timeout: ${NIMBUS_DOCKERHUB_TIMEOUT}"
+          debug "Cached File: ${COMPOSE_FILE}"
        fi
    fi # curl check
 fi
 
 if [[ -n "${COMPOSE_ACTION}" ]]; then
   COMPOSE_COMMAND="${COMPOSE_COMMAND} -p ${PROJECT} -f ${COMPOSE_FILE} ${COMPOSE_ACTION} ${COMPOSE_ARGS}"
-  echo "Running: ${COMPOSE_COMMAND}"
+  debug "Running: ${COMPOSE_COMMAND}"
   eval "${COMPOSE_COMMAND}"
 fi
