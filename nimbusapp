@@ -83,13 +83,13 @@ function create_network() {
 
 function debug() {
     if (( NIMBUS_DEBUG > 0 )); then
-        echo $@
+        echo "$@"
     fi
 }
 
 function output() {
     if (( NIMBUS_OUTPUT > 0 )); then
-        echo $@
+        echo "$@"
     fi
 }
 
