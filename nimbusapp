@@ -74,6 +74,12 @@ function prompt_yn() {
   done
 }
 
+function create_network() {
+    if [[ -z "$(docker network ls -qf "name=${NETWORK_NAME}")" ]]; then
+        docker network create --subnet "${NETWORK_SUBNET}" --gateway "${NETWORK_GATEWAY}" "${NETWORK_NAME}"
+    fi
+}
+
 REPOSITORY="admpresales"
 VERSION="latest"
 PROJECT=""
@@ -92,6 +98,10 @@ DOCKERAPP_ARGS="${NIMBUS_DOCKERAPP_ARGS}"
 NIMBUS_BASEDIR="${NIMBUS_BASEDIR-$HOME/.nimbusapp}"
 NIMBUS_DOCKERHUB_URL="${NIMBUS_DOCKERHUB_URL-https://hub.docker.com}"
 NIMBUS_DOCKERHUB_TIMEOUT="${NIMBUS_DOCKERHUB_TIMEOUT-10}"
+
+NETWORK_NAME="${NETWORK_NAME-demo-net}"
+NETWORK_SUBNET="${NETWORK_SUBNET-172.50.0.0/16}"
+NETWORK_GATEWAY="${NETWORK_GATEWAY-172.50.0.1}"
 
 ENV_FILE="${NIMBUS_BASEDIR}/apps.config"
 
@@ -198,6 +208,8 @@ if [[ -z "${COMPOSE_ACTION}" && -z "${DOCKERAPP_ACTION}" ]]; then
    usage
    exit 1
 fi
+
+create_network
 
 #create a project name for the docker-compose based on the image name.
 if [[ -z ${PROJECT} ]]; then
