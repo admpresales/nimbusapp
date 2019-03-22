@@ -251,7 +251,7 @@ create_network
 
 #create a project name for the docker-compose based on the image name.
 if [[ -z ${PROJECT} ]]; then
-   PROJECT=`echo ${IMAGE}|sed -r 's|\w+/||'|sed 's/:/_/'`
+    PROJECT="$(basename $IMAGE .dockerapp)"
 fi
 
 COMPOSE_ARGS="$@"
