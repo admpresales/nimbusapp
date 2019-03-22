@@ -75,6 +75,21 @@ function prompt_yn() {
   done
 }
 
+# -s var=val
+# docker-app parses the "val" portion as a YAML value, which will cause it to infer a type
+# unquoted numbers cause issues when they are rendered with the inferred type (5.00 becomes 5)
+# we add quotes to the arguments in order to encourage docker-app to treat all values as strings
+function append_dockerapp_arg() {
+    local opt="$1"
+
+    local var
+    local val
+
+    IFS== read var val <<< $2
+
+    DOCKERAPP_ARGS="${DOCKERAPP_ARGS} ${opt} '${var}=\"${val}\"'"
+}
+
 function create_network() {
     if [[ -z "$(docker network ls -qf "name=${NETWORK_NAME}")" ]]; then
         docker network create --subnet "${NETWORK_SUBNET}" --gateway "${NETWORK_GATEWAY}" "${NETWORK_NAME}"
@@ -170,9 +185,8 @@ while [[ "$1" != "" ]]; do
         shift
       ;;
       -s | --set)
-         DOCKERAPP_ARGS="${DOCKERAPP_ARGS} $PARAM $VALUE"
-         shift
-         shift
+         append_dockerapp_arg "$PARAM" "$VALUE"
+         shift 2
          ;;
       -v)
          # check to see if intellij is being called.
