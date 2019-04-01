@@ -8,14 +8,12 @@ load helper
 load docker_assert
 
 function setup() {
-    readonly IMAGE="jasoncorlett/nimbusapp-test:0.1.0"
-    readonly CONTAINER=nimbusapp-test-web
     export NIMBUS_BASEDIR="$BATS_TMPDIR/nimbusapp-test-basic"
 
     if is_first_test; then
         echo "BEFORE FIRST TEST" >&3
         mkdir -p "$NIMBUS_BASEDIR"
-        cleanup_containers "$CONTAINER"
+        cleanup_containers "$TEST_CONTAINER"
     else
         # Stop contact docker hub so we can run quickly
         # This relies on the nimbusapp caching feature
@@ -34,47 +32,47 @@ function teardown() {
 }
 
 @test "Basic: Render" {
-    run "$NIMBUS_EXE" "$IMAGE" -d render
+    run "$NIMBUS_EXE" "$TEST_IMAGE" -d render
 
     (( status == 0 ))
     grep "container_name: nimbusapp-test-web" <<< $output
 }
 
 @test "Basic: Create container" {
-    cleanup_containers "$CONTAINER"
-    assert_not_container_exists "$CONTAINER"
+    cleanup_containers "$TEST_CONTAINER"
+    assert_not_container_exists "$TEST_CONTAINER"
 
-    "$NIMBUS_EXE" "$IMAGE" -d up
+    "$NIMBUS_EXE" "$TEST_IMAGE" -d up
 
-    assert_container_running "$CONTAINER"
+    assert_container_running "$TEST_CONTAINER"
 }
 
 @test "Basic: Stop Container" {
-    assert_container_running "$CONTAINER"
+    assert_container_running "$TEST_CONTAINER"
 
-    "$NIMBUS_EXE" "$IMAGE" -d stop
+    "$NIMBUS_EXE" "$TEST_IMAGE" -d stop
 
-    assert_container_exited "$CONTAINER"
+    assert_container_exited "$TEST_CONTAINER"
 }
 
 @test "Basic: Start Container" {
-    assert_container_exited "$CONTAINER"
+    assert_container_exited "$TEST_CONTAINER"
 
-    "$NIMBUS_EXE" "$IMAGE" -d start
+    "$NIMBUS_EXE" "$TEST_IMAGE" -d start
 
-    assert_container_running "$CONTAINER"
+    assert_container_running "$TEST_CONTAINER"
 }
 
 @test "Basic: Restart Container" {
-    assert_container_running "$CONTAINER"
+    assert_container_running "$TEST_CONTAINER"
 
     sleep 1
 
     local before="$(date +"%s")"
-    "$NIMBUS_EXE" "$IMAGE" -d restart
+    "$NIMBUS_EXE" "$TEST_IMAGE" -d restart
 
-    assert_container_running "$CONTAINER"
-    local startTime="$(date +"%s" -d "$(docker inspect --format "{{.State.StartedAt}}" "$CONTAINER")")"
+    assert_container_running "$TEST_CONTAINER"
+    local startTime="$(date +"%s" -d "$(docker inspect --format "{{.State.StartedAt}}" "$TEST_CONTAINER")")"
 
     echo "Before Start Command: $before" >&2
     echo "Container Start Time: $startTime" >&2
@@ -82,9 +80,9 @@ function teardown() {
 }
 
 @test "Basic: Destroy Container" {
-    assert_container_exists "$CONTAINER"
+    assert_container_exists "$TEST_CONTAINER"
 
-    "$NIMBUS_EXE" "$IMAGE" -d down
+    "$NIMBUS_EXE" "$TEST_IMAGE" -d down
 
-    assert_not_container_exists "$CONTAINER"
+    assert_not_container_exists "$TEST_CONTAINER"
 }

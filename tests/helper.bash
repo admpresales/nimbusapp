@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+readonly TEST_IMAGE="jasoncorlett/nimbusapp-test:0.1.0"
+readonly TEST_CONTAINER=nimbusapp-test-web
+
 export NIMBUS_EXE="$PWD/nimbusapp"
 
 function cleanup_containers() {

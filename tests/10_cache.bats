@@ -12,8 +12,8 @@ function setup() {
 }
 
 function teardown() {
-    cleanup_containers "nimbusapp-test-web"
-    assert_not_container_exists "nimbusapp-test-web"
+    cleanup_containers "$TEST_CONTAINER"
+    assert_not_container_exists "$TEST_CONTAINER"
 
     rm -fvr "$NIMBUS_BASEDIR"
 }
@@ -22,17 +22,17 @@ function teardown() {
     # Use a regular command to generate the cached file
     [[ ! -f "$CACHE_FILE" ]]
 
-    "$NIMBUS_EXE" jasoncorlett/nimbusapp-test:0.1.0 -d -d render
+    "$NIMBUS_EXE" "$TEST_IMAGE" -d -d render
 
     [[ -f "$CACHE_FILE" ]]
 
     # Set a new Docker Hub URL to simulate a connection failure
     export NIMBUS_DOCKERHUB_URL=0.0.0.0:0
-    run "$NIMBUS_EXE" jasoncorlett/nimbusapp-test:0.1.0 -d -d up
+    run "$NIMBUS_EXE" "$TEST_IMAGE" -d -d up
 
     # Command should succeed and create the new container
     (( status == 0 ))
-    assert_container_running "nimbusapp-test-web"
+    assert_container_running "$TEST_CONTAINER"
 
     # Output should contain the following messages
     grep "No connection to Docker Hub, using cached file!" <<< $output
