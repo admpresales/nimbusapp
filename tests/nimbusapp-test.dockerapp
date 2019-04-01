@@ -1,0 +1,20 @@
+version: '0.1.0'
+name: nimbusapp-test
+description: Simple docker-app definition for testing nimbusapp
+namespace: admpresales
+
+---
+version: '3.2'
+
+services:
+  web:
+    container_name: 'nimbusapp-test-web'
+    image: "httpd:2.4"
+    ports:
+      - "${PORT}:80"
+    environment:
+      message: "${MESSAGE}"
+
+---
+PORT: 12345
+MESSAGE: ""
