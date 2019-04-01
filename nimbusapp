@@ -88,6 +88,7 @@ function append_dockerapp_arg() {
     IFS== read var val <<< $2
 
     DOCKERAPP_ARGS="${DOCKERAPP_ARGS} ${opt} '${var}=\"${val}\"'"
+    # DOCKERAPP_ARGS="${DOCKERAPP_ARGS} ${opt} ${var}=${val}"
 }
 
 function create_network() {
@@ -255,7 +256,7 @@ if [[ -z ${PROJECT} ]]; then
 fi
 
 COMPOSE_ARGS="$@"
-COMPOSE_DIR="${HOME}/.nimbusapp/cache/${PROJECT}/${REPOSITORY}/${IMAGE}/${VERSION}"
+COMPOSE_DIR="${NIMBUS_BASEDIR}/cache/${PROJECT}/${REPOSITORY}/${IMAGE}/${VERSION}"
 COMPOSE_FILE="${COMPOSE_DIR}/${IMAGE}.yml"
 COMPOSE_BACKUP="${COMPOSE_FILE}.bk"
 
