@@ -1,6 +1,11 @@
 #!/usr/bin/env bats
 #
-# Warning: These test cases are not isolated, as they depend on the previous steps to
+# Basic usage tests
+#  - Create and destroy a container
+#  - Start/stop/restart containers
+#  - Render a docker-app file
+#
+# Note: These test cases are not isolated, as they depend on the previous steps to
 # have left the container in a specific state
 #
 
@@ -14,7 +19,7 @@ function setup() {
         mkdir -p "$NIMBUS_BASEDIR"
         cleanup_containers "$TEST_CONTAINER"
     else
-        # Stop contact docker hub so we can run quickly
+        # Performance enhancement: stop contacting docker hub after the first test
         # This relies on the nimbusapp caching feature
 
         export NIMBUS_DOCKERHUB_URL="0.0.0.0:0"

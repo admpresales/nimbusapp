@@ -1,4 +1,13 @@
 #!/usr/bin/env bats
+#
+# Tests for offline caching of a compose file. The compose file should be cached after successful commands
+#     in order to run offline later if necessary.
+#
+# To simulate connection failures, we can override NIMBUS_DOCKERHUB_URL with an invalid URL
+#
+# - Ensure the offline file is created
+# - Ensure the offline file is used when a connection to Docker Hub fails
+#
 
 load helper
 load docker_assert

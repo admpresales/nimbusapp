@@ -1,4 +1,12 @@
 #!/usr/bin/env bats
+#
+# Tests for the nimbusapp --set|-s options, which should be rendered by docker-app
+#    into the compose file
+#
+# - Ensure the --set value is passed to the container
+# - Ensure that no undue formatting is performed
+#
+#
 
 load helper
 load docker_assert
