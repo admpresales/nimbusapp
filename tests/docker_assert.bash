@@ -22,13 +22,14 @@ function assert_container_exited() {
 }
 
 function assert_container_exists() {
-    local container="$1"
-    local silent=0
+    local container silent=0
 
     if [[ "$1" == "--silent" ]]; then
         silent=1
         shift
     fi
+
+    container="$1"
 
     # Name needs to match exactly
     if grep -q "^${container}\$" < <(docker ps --all --format "{{.Names}}"); then
