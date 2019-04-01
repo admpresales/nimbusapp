@@ -4,8 +4,14 @@ load helper
 load docker_assert
 
 function setup() {
+    local repo img version tmp
+
+    IFS='/' read repo tmp <<< $TEST_IMAGE
+    IFS=':' read img version <<< $tmp
+
     export NIMBUS_BASEDIR="$BATS_TMPDIR/nimbus-test-$$"
-    export CACHE_FILE="$NIMBUS_BASEDIR/cache/nimbusapp-test/jasoncorlett/nimbusapp-test/0.1.0/nimbusapp-test.yml"
+    # cache file pattern: .nimbusapp/cache/<project>/<repository>/<image>/<version>/<image>.yml
+    export CACHE_FILE="$NIMBUS_BASEDIR/cache/${img}/${repo}/${img}/${version}/${img}.yml"
 
     teardown
     mkdir -vp "$NIMBUS_BASEDIR"

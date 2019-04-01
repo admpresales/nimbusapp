@@ -11,7 +11,6 @@ function setup() {
     export NIMBUS_BASEDIR="$BATS_TMPDIR/nimbusapp-test-basic"
 
     if is_first_test; then
-        echo "BEFORE FIRST TEST" >&3
         mkdir -p "$NIMBUS_BASEDIR"
         cleanup_containers "$TEST_CONTAINER"
     else
@@ -25,7 +24,6 @@ function setup() {
 function teardown() {
     # Only run once after last
     if is_last_test; then
-        echo "AFTER LAST TEST" >&3
         cleanup_containers
         rm -fr "$NIMBUS_BASEDIR"
     fi

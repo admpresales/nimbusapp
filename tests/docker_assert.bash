@@ -23,19 +23,25 @@ function assert_container_exited() {
 
 function assert_container_exists() {
     local container="$1"
+    local silent=0
+
+    if [[ "$1" == "--silent" ]]; then
+        silent=1
+        shift
+    fi
 
     # Name needs to match exactly
     if grep -q "^${container}\$" < <(docker ps --all --format "{{.Names}}"); then
         return 0
     else
-        echo "FAIL: assert_container_exists $1"
+        (( silent == 0 )) && echo "FAIL: assert_container_exists $1" >&2
         return 1
     fi
 }
 
 function assert_not_container_exists() {
     # Suppress error reports
-    if assert_container_exists "$1" 2>/dev/null; then
+    if assert_container_exists --silent "$1" 2>/dev/null; then
         echo "FAIL: assert_not_container_exists $1" >&2
         return 1
     else
