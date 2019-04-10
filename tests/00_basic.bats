@@ -85,7 +85,7 @@ function teardown() {
 @test "Basic: Destroy Container" {
     assert_container_exists "$TEST_CONTAINER"
 
-    "$NIMBUS_EXE" "$TEST_IMAGE" -d down
+    "$NIMBUS_EXE" "$TEST_IMAGE" -f -d down
 
     assert_not_container_exists "$TEST_CONTAINER"
 }
