@@ -14,6 +14,7 @@ function usage()
    output -e "  -p          Docker-compose project name to use - EXPERIMENTAL NOT RECOMMENDED FOR CASUAL USERS"
    output -e "  -d, --debug Enable debugging output (use twice for verbose bash commands)"
    output -e "  -f, --force Skip all prompts - Use with caution, this option will happily delete your data without warning"
+   output -e "  --version   Print the version of nimbusapp and exit"
    output -e ""
    output -e "Commands:"
    output -e "  down     Stop and remove containers"
@@ -27,6 +28,13 @@ function usage()
    output -e "  start    Start existing containers"
    output -e "  stop     Stop existing containers"
    output -e "  up       Creates and start containers"
+   output -e "  version  Prints version information"
+   output -e "  help     Prints this help message"
+}
+
+function version_info() {
+  output "nimbusapp version $NIMBUS_RELEASE_VERSION"
+  output "Released on $NIMBUS_RELEASE_DATE"
 }
 
 function product_exists(){
@@ -131,6 +139,9 @@ function output() {
     fi
 }
 
+readonly NIMBUS_RELEASE_VERSION="UNRELEASED"
+readonly NIMBUS_RELEASE_DATE="UNRELEASED"
+
 BASH_VERBOSE=""
 
 REPOSITORY="admpresales"
@@ -169,6 +180,11 @@ if [[ "${IMAGE}" = *"help"* ]]; then
   exit 0
 fi
 
+if [[ "${IMAGE}" = *"version"* ]]; then
+  version_info
+  exit 0
+fi
+
 if [[ "$IMAGE" == *\/* ]]; then
   REPOSITORY=$(echo $IMAGE | cut -d'/' -f1 )
   IMAGE=$(echo $IMAGE | cut -d'/' -f2 )
@@ -199,6 +215,10 @@ while [[ "$1" != "" ]]; do
   case "$PARAM" in
     -h | --help | help)
       usage
+      exit 0
+      ;;
+    --version)
+      version_info
       exit 0
       ;;
       -d|--debug)
