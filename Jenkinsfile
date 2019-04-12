@@ -50,6 +50,19 @@ pipeline {
             }
         } // Docker Hub
 
+        stage('Build') {
+            steps {
+                script {
+                    releaseDate = new Date().format('YYYY-MM-dd')
+                }
+
+                sh """
+                    sed -i -e 's#\\(readonly NIMBUS_RELEASE_VERSION=\\).*#\\1"${env.BRANCH_NAME}"#' \\
+                           -e 's#\\(readonly NIMBUS_RELEASE_DATE=\\).*#\\1"${releaseDate}"#' nimbusapp
+                """
+            }
+        }
+
         stage('Test Setup') {
             steps {
                 dir('bats-core') {
@@ -83,14 +96,6 @@ pipeline {
 
         stage('Archive') {
             steps {
-                script {
-                    releaseDate = new Date().format('YYYY-MM-dd')
-                }
-                sh """
-                    sed -i -e 's#\\(readonly NIMBUS_RELEASE_VERSION=\\).*#\\1"${env.BRANCH_NAME}"#' \\
-                           -e 's#\\(readonly NIMBUS_RELEASE_DATE=\\).*#\\1"${releaseDate}"#' nimbusapp
-                """
-
                 archiveArtifacts artifacts: 'nimbusapp,bats-tap.log,test-versions.txt'
             }
         } // Archive
