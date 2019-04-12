@@ -74,7 +74,7 @@ pipeline {
                     docker version
                     docker-compose version
                     docker-app version
-                    nimbusapp version
+                    ./nimbusapp version
                 ) 2>&1 | tee test-versions.txt
                 '''
             }
