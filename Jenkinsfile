@@ -55,15 +55,24 @@ pipeline {
                 dir('bats-core') {
                     git(url: 'https://github.com/bats-core/bats-core')
                 }
+                sh '''
+                (
+                    set -x
+                    docker version
+                    docker-compose version
+                    docker-app version
+                    nimbusapp version
+                ) 2>&1 | tee test-versions.txt
+                '''
             }
         } // Test Setup
 
         stage('Test') {
             steps {
                 sh '''
-                        export PATH="$PWD/bats-core/libexec/bats-core:$PATH"
-                        bats tests --tap | tee bats-tap.log
-                    '''
+                    export PATH="$PWD/bats-core/libexec/bats-core:$PATH"
+                    bats tests --tap | tee bats-tap.log
+                '''
             }
             post {
                 always {
@@ -82,7 +91,7 @@ pipeline {
                            -e 's#\\(readonly NIMBUS_RELEASE_DATE=\\).*#\\1"${releaseDate}"#' nimbusapp
                 """
 
-                archiveArtifacts artifacts: 'nimbusapp,bats-tap.log'
+                archiveArtifacts artifacts: 'nimbusapp,bats-tap.log,test-versions.txt'
             }
         } // Archive
     } // stages
