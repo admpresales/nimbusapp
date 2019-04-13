@@ -4,6 +4,7 @@
 #
 
 load helper
+load output_assert
 load docker_assert
 
 function setup() {
@@ -30,31 +31,31 @@ function teardown() {
 }
 
 @test "Prompt: Yes" {
-    run "$NIMBUS_EXE" "$TEST_IMAGE" -d down <<< y
+    run "$NIMBUS_EXE" "$TEST_IMAGE" -d down <<< $'y\n'
 
     (( status == 0 ))
     assert_not_container_exists "$TEST_CONTAINER"
 
-    grep "The following containers will be deleted:" <<< $output
-    grep "- nimbusapp-test-web" <<< $output
-    grep "Do you wish to DELETE these containers [y/n]" <<< $output
-    grep "Stopping nimbusapp-test-web ... done" <<< $output
-    grep "Removing nimbusapp-test-web ... done" <<< $output
+    assert_output_contains "The following containers will be deleted:"
+    assert_output_contains "- /nimbusapp-test-web" 
+    assert_output_contains "Do you wish to DELETE these containers? \[y/n\]"
+    assert_output_contains "Stopping nimbusapp-test-web ... done"
+    assert_output_contains "Removing nimbusapp-test-web ... done"
 }
 
 @test "Prompt: No" {
 
-    run "$NIMBUS_EXE" "$TEST_IMAGE" -d down <<< n
+    run "$NIMBUS_EXE" "$TEST_IMAGE" -d down <<< $'n\n'
 
     (( status == 1 ))
     assert_container_exists "$TEST_CONTAINER"
 
-    grep "The following containers will be deleted:" <<< $output
-    grep "- nimbusapp-test-web" <<< $output
-    grep "Do you wish to DELETE these containers [y/n]" <<< $output
+    assert_output_contains "The following containers will be deleted:"
+    assert_output_contains "- /nimbusapp-test-web"
+    assert_output_contains "Do you wish to DELETE these containers? \[y/n\]"
 
-    grep -v "Stopping" <<< $output
-    grep -v "Removing" <<< $output
+    assert_not_output_contains "Stopping"
+    assert_not_output_contains "Removing"
 }
 
 @test "Prompt: Force" {
@@ -63,10 +64,10 @@ function teardown() {
     (( stauts == 0 ))
     assert_not_container_exists "$TEST_CONTAINER"
 
-    grep -v "The following containers will be deleted:" <<< $output
-    grep -v "- nimbusapp-test-web" <<< $output
-    grep -v "Do you wish to DELETE these containers [y/n]" <<< $output
+    assert_not_output_contains "The following containers will be deleted:"
+    assert_not_output_contains "- /nimbusapp-test-web"
+    assert_not_output_contains "Do you wish to DELETE these containers? [y/n]"
 
-    grep "Stopping nimbusapp-test-web ... done" <<< $output
-    grep "Removing nimbusapp-test-web ... done" <<< $output
+    assert_output_contains "Stopping nimbusapp-test-web ... done"
+    assert_output_contains "Removing nimbusapp-test-web ... done"
 }
