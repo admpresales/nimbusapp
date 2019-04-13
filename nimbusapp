@@ -96,8 +96,9 @@ prompt_delete() {
     echo -e "${C_BOLD}You may wish to use ${C_RESET}\`nimbusapp ... stop'${C_BOLD} to shut down your containers without deleting them${C_RESET}"
     echo
     echo -e "${C_BOLD}The following containers will be deleted:${C_RESET}"
+
     docker-compose -p "${PROJECT}" -f "$COMPOSE_FILE" ps -q | while read id; do
-        docker inspect --format "\\t{{.Name}}" "$id"
+        docker inspect --format "- {{.Name}}" "$id"
     done
     echo
 
@@ -364,7 +365,7 @@ if [[ -n "${DOCKERAPP_ACTION}" ]]; then
    fi # curl check
 fi
 
-if [[ "$COMPOSE_ACTION" == "down" && "$FORCE" -eq 0 ]]; then
+if [[ "$COMPOSE_ACTION" == "down" && "$NIMBUS_FORCE" -eq 0 ]]; then
     if ! prompt_delete; then
         exit 1
     fi
