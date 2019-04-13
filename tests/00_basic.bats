@@ -29,7 +29,7 @@ function setup() {
 function teardown() {
     # Only run once after last
     if is_last_test; then
-        cleanup_containers
+        cleanup_containers "$TEST_CONTAINER"
         rm -fr "$NIMBUS_BASEDIR"
     fi
 }
