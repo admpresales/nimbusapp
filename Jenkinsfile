@@ -16,6 +16,12 @@ pipeline {
     }
 
     stages {
+        stage('Setup') {
+            steps {
+                checkout scm
+            }
+        }
+
         stage('Docker Hub') {
             when {
                 anyOf {
@@ -26,7 +32,7 @@ pipeline {
                         }
                         changeset 'tests/nimbusapp-test.dockerapp'
                     }
-                    expression { params.FORCE_PUSH_DOCKERAPP }
+                    expression { params.DOCKERAPP_FORCE_PUSH }
                 }
             }
             steps {
