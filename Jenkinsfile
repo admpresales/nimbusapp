@@ -42,7 +42,7 @@ pipeline {
                     //  - Job is in root folder of this instance
                     pushOpts = $/--namespace "${env.JOB_NAME.split('/')[0]}"/$
 
-                    if (params.FORCE_PUSH_DOCKERAPP && params.DOCKERAPP_TAG) {
+                    if (params.DOCKERAPP_FORCE_PUSH && params.DOCKERAPP_TAG) {
                         pushOpts += $/ --tag "${params.DOCKERAPP_TAG}"/$
                     }
                 }
