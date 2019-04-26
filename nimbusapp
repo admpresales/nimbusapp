@@ -13,6 +13,8 @@ function usage()
    output -e "  -m          Mounts volume for .m2 in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS"
    output -e "  -p          Docker-compose project name to use - EXPERIMENTAL NOT RECOMMENDED FOR CASUAL USERS"
    output -e "  -d, --debug Enable debugging output (use twice for verbose bash commands)"
+   output -e "  -f, --force Skip all prompts - Use with caution, this option will happily delete your data without warning"
+   output -e "  --version   Print the version of nimbusapp and exit"
    output -e ""
    output -e "Commands:"
    output -e "  down     Stop and remove containers"
@@ -26,6 +28,13 @@ function usage()
    output -e "  start    Start existing containers"
    output -e "  stop     Stop existing containers"
    output -e "  up       Creates and start containers"
+   output -e "  version  Prints version information"
+   output -e "  help     Prints this help message"
+}
+
+function version_info() {
+  output "nimbusapp version $NIMBUS_RELEASE_VERSION"
+  output "Released on $NIMBUS_RELEASE_DATE"
 }
 
 function product_exists(){
@@ -59,7 +68,7 @@ function prompt_yn() {
   local PROMPT_TEXT=$"${1-Continue?} [y/n]"
   local USER_ANSWER
 
-  echo -n "${PROMPT_TEXT} "
+  echo -ne "${PROMPT_TEXT} "
 
   while read USER_ANSWER; do
     case "${USER_ANSWER}" in
@@ -71,8 +80,30 @@ function prompt_yn() {
         ;;
     esac
 
-    echo -n "${PROMPT_TEXT} "
+    echo -ne "${PROMPT_TEXT} "
   done
+}
+
+prompt_delete() {
+    local C_REG="\e[39m"
+    local C_BOLD="\e[1m"
+    local C_RED="\e[91m"
+    local C_RESET="\e[0m"
+
+    echo
+    echo -e "${C_BOLD}This action will ${C_BOLD}${C_RED}DELETE${C_REG} your containers and is ${C_BOLD}${C_RED}IRREVERSIBLE${C_RESET}!"
+    echo
+    echo -e "${C_BOLD}You may wish to use ${C_RESET}\`nimbusapp ... stop'${C_BOLD} to shut down your containers without deleting them${C_RESET}"
+    echo
+    echo -e "${C_BOLD}The following containers will be deleted:${C_RESET}"
+
+    docker-compose -p "${PROJECT}" -f "$COMPOSE_FILE" ps -q | while read id; do
+        docker inspect --format "- {{.Name}}" "$id"
+    done
+    echo
+
+    prompt_yn "${C_BOLD}${C_RED}Do you wish to DELETE these containers?${C_RESET}"
+    return $?
 }
 
 # -s var=val
@@ -109,6 +140,9 @@ function output() {
     fi
 }
 
+readonly NIMBUS_RELEASE_VERSION="UNRELEASED"
+readonly NIMBUS_RELEASE_DATE="UNRELEASED"
+
 BASH_VERBOSE=""
 
 REPOSITORY="admpresales"
@@ -129,8 +163,9 @@ DOCKERAPP_ARGS="${NIMBUS_DOCKERAPP_ARGS}"
 NIMBUS_BASEDIR="${NIMBUS_BASEDIR-$HOME/.nimbusapp}"
 NIMBUS_DOCKERHUB_URL="${NIMBUS_DOCKERHUB_URL-https://hub.docker.com}"
 NIMBUS_DOCKERHUB_TIMEOUT="${NIMBUS_DOCKERHUB_TIMEOUT-10}"
-NIMBUS_DEBUG=0
-NIMBUS_OUTPUT=1
+NIMBUS_DEBUG="${NIMBUS_DEBUG-0}"
+NIMBUS_OUTPUT="${NIMBUS_OUTPUT-1}"
+NIMBUS_FORCE="${NIMBUS_FORCE-0}"
 
 NETWORK_NAME="${NETWORK_NAME-demo-net}"
 NETWORK_SUBNET="${NETWORK_SUBNET-172.50.0.0/16}"
@@ -143,6 +178,11 @@ IMAGE="$1"
 shift
 if [[ "${IMAGE}" = *"help"* ]]; then
   usage
+  exit 0
+fi
+
+if [[ "${IMAGE}" = *"version"* ]]; then
+  version_info
   exit 0
 fi
 
@@ -176,6 +216,10 @@ while [[ "$1" != "" ]]; do
   case "$PARAM" in
     -h | --help | help)
       usage
+      exit 0
+      ;;
+    --version)
+      version_info
       exit 0
       ;;
       -d|--debug)
@@ -218,6 +262,10 @@ while [[ "$1" != "" ]]; do
          shift
          shift
          ;;
+      -f|--force)
+        NIMBUS_FORCE=1
+        shift
+        ;;
       render|inspect)
         DOCKERAPP_ACTION="${PARAM}"
         shift
@@ -259,6 +307,7 @@ COMPOSE_ARGS="$@"
 COMPOSE_DIR="${NIMBUS_BASEDIR}/cache/${PROJECT}/${REPOSITORY}/${IMAGE}/${VERSION}"
 COMPOSE_FILE="${COMPOSE_DIR}/${IMAGE}.yml"
 COMPOSE_BACKUP="${COMPOSE_FILE}.bk"
+
 
 if [[ -n "${DOCKERAPP_ACTION}" ]]; then
    if curl -s --connect-timeout "${NIMBUS_DOCKERHUB_TIMEOUT}" "${NIMBUS_DOCKERHUB_URL}" > /dev/null 2>&1; then
@@ -314,6 +363,12 @@ if [[ -n "${DOCKERAPP_ACTION}" ]]; then
           debug "Cached File: ${COMPOSE_FILE}"
        fi
    fi # curl check
+fi
+
+if [[ "$COMPOSE_ACTION" == "down" && "$NIMBUS_FORCE" -eq 0 ]]; then
+    if ! prompt_delete; then
+        exit 1
+    fi
 fi
 
 if [[ -n "${COMPOSE_ACTION}" ]]; then

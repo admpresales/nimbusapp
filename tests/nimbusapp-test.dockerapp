@@ -1,4 +1,4 @@
-version: '0.1.0'
+version: 'untagged'
 name: nimbusapp-test
 description: Simple docker-app definition for testing nimbusapp
 namespace: admpresales

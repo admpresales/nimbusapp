@@ -29,7 +29,7 @@ function setup() {
 function teardown() {
     # Only run once after last
     if is_last_test; then
-        cleanup_containers
+        cleanup_containers "$TEST_CONTAINER"
         rm -fr "$NIMBUS_BASEDIR"
     fi
 }
@@ -85,7 +85,7 @@ function teardown() {
 @test "Basic: Destroy Container" {
     assert_container_exists "$TEST_CONTAINER"
 
-    "$NIMBUS_EXE" "$TEST_IMAGE" -d down
+    "$NIMBUS_EXE" "$TEST_IMAGE" -f -d down
 
     assert_not_container_exists "$TEST_CONTAINER"
 }
