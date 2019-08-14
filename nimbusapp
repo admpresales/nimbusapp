@@ -84,11 +84,11 @@ function prompt_yn() {
     done
 }
 
-prompt_delete() {
-    local C_REG="\e[39m"
-    local C_BOLD="\e[1m"
-    local C_RED="\e[91m"
-    local C_RESET="\e[0m"
+# Colour codes
+readonly C_REG="\e[39m"     # Regular colour
+readonly C_BOLD="\e[1m"     # Bold font
+readonly C_RED="\e[91m"     # Red colour
+readonly C_RESET="\e[0m"    # Reset font and colour
 
 prompt_delete() {
     echo
@@ -105,6 +105,53 @@ prompt_delete() {
 
     prompt_yn "${C_BOLD}${C_RED}Do you wish to DELETE these containers?${C_RESET}"
     return $?
+}
+
+prompt_recreate() {
+    echo
+    echo -e "${C_BOLD}This action will cause one or more of your containers to be ${C_RED}DELETED${C_REG} and ${C_RED}RECREATED${C_REG}.${C_RESET}"
+    echo
+    echo -e "${C_BOLD}Recreating containers is normal when changing their configuration, such as image, tag and ports.${C_RESET}"
+    echo
+    echo -e "${C_BOLD}You may wish to use ${C_RESET}\`nimbusapp ... start'${C_BOLD} to start your existing containers.${C_RESET}"
+    echo
+    echo -e "${C_BOLD}The following containers will be recreated:${C_RESET}"
+
+    for c in "$@"; do
+        echo "- $c"
+    done
+    
+    echo
+    prompt_yn "${C_BOLD}${C_RED}Recreate the listed containers?${C_RESET}"
+    return $?
+}
+
+check_recreate() {
+    local composeFile="$1"
+
+    local containers=($(docker-compose -p "$PROJECT" -f "$COMPOSE_FILE" ps -aq))
+    local recreate=()
+
+    local service hash composeHash name
+
+    for id in "${containers[@]}"; do
+        service="$(docker inspect "$id" --format '{{index .Config.Labels "com.docker.compose.service"}}')"
+        hash="$(docker inspect "$id" --format '{{index .Config.Labels "com.docker.compose.config-hash"}}')"
+        
+        composeHash="$(docker-compose -p "$PROJECT" -f "$COMPOSE_FILE" config --hash="$service")"
+
+        if [[ "$service $hash" != "$composeHash" ]]; then
+            name="$(docker inspect "$id" --format {{.Name}})"
+            recreate+=("$name")
+        fi
+    done
+
+    if [[ ${#recreate[@]} -gt 0 ]]; then
+        prompt_recreate "${recreate[@]}"
+        return $?
+    fi
+
+    return 0
 }
 
 # -s var=val
@@ -368,6 +415,12 @@ fi
 
 if [[ "$COMPOSE_ACTION" == "down" && "$NIMBUS_FORCE" -eq 0 ]]; then
     if ! prompt_delete; then
+        exit 1
+    fi
+fi
+
+if [[ "$COMPOSE_ACTION" == "up -d" && "$NIMBUS_FORCE" -eq 0 ]]; then
+    if ! check_recreate; then
         exit 1
     fi
 fi
