@@ -5,7 +5,7 @@ This script is based on the images in https://hub.docker.com/u/admpresales
 
 ## Installation
 
-Download the latest .tar.gz release from: https://github.com/admpresales/nimbusapp/releases
+Download the latest .tar.gz release from https://github.com/admpresales/nimbusapp/releases by executing the following command from a terminal window:
 
 ```
 wget -nv https://github.com/admpresales/nimbusapp/releases/latest/download/nimbusapp.tar.gz
@@ -23,7 +23,7 @@ To verify your installation, run the `nimbusapp version` command and compare the
 
 ```
 demo@nimbusserver Downloads]$ nimbusapp version
-nimbusapp version A.B.C
+nimbusapp version N.N.N
 Released on YYYY-MM-DD
 ```
 
