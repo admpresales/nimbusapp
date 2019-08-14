@@ -12,6 +12,7 @@ function assert_output_contains() {
         return 0
     else
         echo "FAIL: Expected output to contain: \`$term'" >&2
+        filtered_output
         return 1
     fi
 }
@@ -23,6 +24,7 @@ function assert_not_output_contains() {
         return 0
     else
         echo "FAIL: Expected output *not* to contain: \`$term''" >&2
+        filtered_output
         return 1
     fi
 }
