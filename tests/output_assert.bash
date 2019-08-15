@@ -11,6 +11,8 @@ function assert_output_contains() {
     if filtered_output | grep -e "$term"; then
         return 0
     else
+        echo "FAIL: Expected output to contain: \`$term'" >&2
+        filtered_output
         return 1
     fi
 }
@@ -21,6 +23,8 @@ function assert_not_output_contains() {
     if filtered_output | grep -v -e "$term"; then
         return 0
     else
+        echo "FAIL: Expected output *not* to contain: \`$term''" >&2
+        filtered_output
         return 1
     fi
 }
