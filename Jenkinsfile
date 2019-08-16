@@ -102,7 +102,10 @@ pipeline {
 
         stage('Archive') {
             steps {
-                archiveArtifacts artifacts: 'nimbusapp,bats-tap.log,test-versions.txt'
+                sh '''
+                tar -czvf nimbusapp.tar.gz nimbusapp
+                '''
+                archiveArtifacts artifacts: 'nimbusapp,nimbusapp.tar.gz,bats-tap.log,test-versions.txt'
             }
         } // Archive
     } // stages
