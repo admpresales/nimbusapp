@@ -22,7 +22,7 @@ pipeline {
                     slackSend(
                         channel: 'nimbus',
                         message: "${env.JOB_NAME} - ${currentBuild.displayName} ${currentBuild.buildCauses[0].shortDescription} (<${env.JOB_URL}|Open>)",
-                        color: (currentBuild.previousBuild.result == 'SUCCESS') ? 'good' : 'danger'
+                        color: (currentBuild.previousBuild?.result == 'SUCCESS') ? 'good' : 'danger'
                     )
                 }
             }
