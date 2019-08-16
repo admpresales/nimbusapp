@@ -39,9 +39,9 @@ function version_info() {
 
 function product_exists(){
     #if we find an entry, return 0 for success, else 1 for failure
-    #forcing a short name standard since someone could pass intellij or intellij.dockerapp
-    image=$(echo $IMAGE | cut -d'.' -f1 )
-    if [[ $(grep "^${image}" ${ENV_FILE} | wc -l) -eq 1 ]]
+    local image="$(echo $IMAGE | cut -d'.' -f1 ).dockerapp"
+
+    if [[ $(grep "^${image}\b" ${ENV_FILE} -c) -eq 1 ]]
     then
         return 0
     else
@@ -243,12 +243,10 @@ if [[ "$IMAGE" == *:* ]]; then
     VERSION=$(echo $IMAGE | cut -d':' -f2 )
     IMAGE=$(echo $IMAGE | cut -d':' -f1 )
 elif [[ -e $ENV_FILE ]]; then
-    product_exists
-    prodExists=$?
-    if [[ $prodExists -eq 0 ]]; then
+    if product_exists; then
         #ensuring uniform comparision since someone could pass intillij or intellij.dockerapp
         IMAGE=$(echo $IMAGE | cut -d'.' -f1 )".dockerapp"
-        VERSION=$(grep "^${IMAGE}" ${ENV_FILE} | cut -d':' -f2 )
+        VERSION=$(grep "^${IMAGE}\b" ${ENV_FILE} | cut -d':' -f2 )
         output "Using ${IMAGE}:${VERSION} version found in ${ENV_FILE}"
     else
         output "Not able to find ${IMAGE} in ${ENV_FILE}.  Will attempt to start using ${IMAGE}:${VERSION}"
