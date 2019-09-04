@@ -100,10 +100,12 @@ pipeline {
 
         stage('Test') {
             steps {
-                sh '''
-                    export PATH="$PWD/bats-core/libexec/bats-core:$PATH"
-                    bats tests --tap | tee bats-tap.log
-                '''
+                lock('nimbusapp-test') {
+                    sh '''
+                        export PATH="$PWD/bats-core/libexec/bats-core:$PATH"
+                        bats tests --tap | tee bats-tap.log
+                    '''
+                }
             }
             post {
                 always {
