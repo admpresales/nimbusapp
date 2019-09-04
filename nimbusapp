@@ -129,7 +129,7 @@ prompt_recreate() {
 check_recreate() {
     local composeFile="$1"
 
-    local containers=($(docker-compose -p "$PROJECT" -f "$COMPOSE_FILE" ps -aq))
+    local containers=($(docker-compose -p "$PROJECT" -f "$COMPOSE_FILE" ps -q))
     local recreate=()
 
     local service hash composeHash name
