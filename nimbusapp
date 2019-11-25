@@ -296,7 +296,14 @@ while [[ "$1" != "" ]]; do
         ;;
     up)
         DOCKERAPP_ACTION="render"
-        COMPOSE_ACTION="up -d"
+        
+        # Start in background if required
+        if [[ "$@" == *"--no-start"* ]]; then
+            COMPOSE_ACTION="up"
+        else 
+            COMPOSE_ACTION="up -d"
+        fi
+
         shift
         break
         ;;
