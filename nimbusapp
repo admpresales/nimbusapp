@@ -288,9 +288,14 @@ while [[ "$1" != "" ]]; do
         shift
         break
         ;;
-    down | start | stop | ps | rm | logs | restart | pull )
-        DOCKERAPP_ACTION="render"
+    down | start | stop | ps | rm | logs | restart )
         COMPOSE_ACTION="${PARAM}"
+        shift
+        break
+        ;;
+    pull)
+        DOCKERAPP_ACTION="render"
+        COMPOSE_ACTION="pull"
         shift
         break
         ;;
