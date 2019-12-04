@@ -37,6 +37,78 @@ function version_info() {
     output "Released on $NIMBUS_RELEASE_DATE"
 }
 
+# Ensure the apps.config file is initialized
+#
+# Also upgrades from v1 to v2 file format.
+# v2 includes project name, tries to eliminate extra .dockerapps, and is a bit easier to parse
+function apps_init() {
+    # If v2 file exists, nothing to do
+    if grep '^\s*#\s*v2\s*$' "$file" >/dev/null 2>&1; then
+        return
+    fi
+
+    local template="# v2"
+    local file="${1-$ENV_FILE}"
+    local tmp="${file}.tmp$$"
+    local backup="${file}.v1-backup"
+
+    local proj img repo tag
+
+    # Easy path, no file! Create it and return
+    if [[ ! -f "$file" ]]; then
+        echo $template > "$file"
+        return
+    fi
+
+    mv "$file" "$tmp"
+    echo $template > "$file"
+
+    while read proj img; do
+        proj="${proj%.dockerapp}"
+        IFS=/: read repo img tag <<< $img
+
+        echo $proj $repo $img $tag
+    done < "$tmp" > "$file"
+
+    mv "$tmp" "$backup"
+}
+
+function apps_load() {
+    apps_init
+
+    local search="${1-$PROJECt}"
+    local file="${2-$ENV_FILE}"
+    local entry proj repo img ver
+
+    debug "Searching apps for: ${search}"
+
+    entry="$(grep "^${search}\b" "${file}")"
+
+    debug "Apps found: ${entry}"
+
+    if [[ -n $entry ]]; then
+        read proj repo img ver <<< $entry
+
+        REPOSITORY="${REPOSITORY-$repo}"
+        VERSION="${VERSION-$ver}"
+        IMAGE="${IMAGE-$img}"
+    fi
+}
+
+function apps_save() {
+    apps_init
+
+    local file="${1-$ENV_FILE}"
+
+    debug "Saving: $PROJECT $REPOSITORY $IMAGE $VERSION"
+
+    # Remove previous entry for this project
+    sed -i "/$PROJECT\b/d" "$file"
+
+    # Write new entry
+    echo $PROJECT $REPOSITORY $IMAGE $VERSION >> "$file"
+}
+
 # create folders to use for mount points
 # currently not leverated by Intellij
 function create_intellij_mount_points (){
@@ -324,78 +396,6 @@ while [[ "$1" != "" ]]; do
         exit 1
     esac
 done
-
-# Ensure the apps.config file is initialized
-#
-# Also upgrades from v1 to v2 file format.
-# v2 includes project name, tries to eliminate extra .dockerapps, and is a bit easier to parse
-function apps_init() {
-    # If v2 file exists, nothing to do
-    if grep '^\s*#\s*v2\s*$' "$file" >/dev/null 2>&1; then
-        return
-    fi
-
-    local template="# v2"
-    local file="${1-$ENV_FILE}"
-    local tmp="${file}.tmp$$"
-    local backup="${file}.v1-backup"
-
-    local proj img repo tag
-
-    # Easy path, no file! Create it and return
-    if [[ ! -f "$file" ]]; then
-        echo $template > "$file"
-        return
-    fi
-
-    mv "$file" "$tmp"
-    echo $template > "$file"
-
-    while read proj img; do
-        proj="${proj%.dockerapp}"
-        IFS=/: read repo img tag <<< $img
-
-        echo $proj $repo $img $tag
-    done < "$tmp" > "$file"
-
-    mv "$tmp" "$backup"
-}
-
-function apps_load() {
-    apps_init
-
-    local search="${1-$PROJECt}"
-    local file="${2-$ENV_FILE}"
-    local entry proj repo img ver
-
-    debug "Searching apps for: ${search}"
-
-    entry="$(grep "^${search}\b" "${file}")"
-
-    debug "Apps found: ${entry}"
-
-    if [[ -n $entry ]]; then
-        read proj repo img ver <<< $entry
-
-        REPOSITORY="${REPOSITORY-$repo}"
-        VERSION="${VERSION-$ver}"
-        IMAGE="${IMAGE-$img}"
-    fi
-}
-
-function apps_save() {
-    apps_init
-
-    local file="${1-$ENV_FILE}"
-
-    debug "Saving: $PROJECT $REPOSITORY $IMAGE $VERSION"
-
-    # Remove previous entry for this project
-    sed -i "/$PROJECT\b/d" "$file"
-
-    # Write new entry
-    echo $PROJECT $REPOSITORY $IMAGE $VERSION >> "$file"
-}
 
 if [[ "$IMAGE" == */* ]]; then
     IFS=/ read REPOSITORY IMAGE <<< $IMAGE
