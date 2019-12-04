@@ -208,6 +208,8 @@ NETWORK_NAME="${NETWORK_NAME-demo-net}"
 NETWORK_SUBNET="${NETWORK_SUBNET-172.50.0.0/16}"
 NETWORK_GATEWAY="${NETWORK_GATEWAY-172.50.0.1}"
 
+PRESERVE_VOLUMES=0
+
 ENV_FILE="${NIMBUS_BASEDIR}/apps.config"
 
 if [[ "$1" != "-"* ]]; then
@@ -281,6 +283,10 @@ while [[ "$1" != "" ]]; do
         ;;
     -f|--force)
         NIMBUS_FORCE=1
+        shift
+        ;;
+    --preserve-volumes)
+        PRESERVE_VOLUMES=1
         shift
         ;;
     render|inspect)
@@ -517,8 +523,18 @@ if [[ "$COMPOSE_ACTION" == "up -d" && "$NIMBUS_FORCE" -eq 0 ]]; then
 fi
 
 if [[ -n "${COMPOSE_ACTION}" ]]; then
+    if [[ $COMPOSE_ACTION == *"up"* && $PRESERVE_VOLUMES -eq 0 ]]; then
+        COMPOSE_ARGS="$COMPOSE_ARGS -V"
+    fi
+
+    if [[ $COMPOSE_ACTION == *"down"* && $PRESERVE_VOLUMES -eq 0 ]]; then
+        COMPOSE_ARGS="$COMPOSE_ARGS -v"
+    fi
+
     COMPOSE_COMMAND="${COMPOSE_COMMAND} -p ${PROJECT} -f ${COMPOSE_FILE} ${COMPOSE_ACTION} ${COMPOSE_ARGS}"
+
     debug "Running: ${COMPOSE_COMMAND}"
+
     if ! eval "${COMPOSE_COMMAND}"; then
         rc=$?
         echo "Failed to run compose: $rc" >&2
