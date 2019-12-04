@@ -210,20 +210,20 @@ NETWORK_GATEWAY="${NETWORK_GATEWAY-172.50.0.1}"
 
 ENV_FILE="${NIMBUS_BASEDIR}/apps.config"
 
-IMAGE="$1"
+if [[ "$1" != "-"* ]]; then
+    IMAGE="$1"
 
-shift
-if [[ "${IMAGE}" = *"help"* ]]; then
-    usage
-    exit 0
+    shift
+    if [[ "${IMAGE}" = *"help"* ]]; then
+        usage
+        exit 0
+    fi
+
+    if [[ "${IMAGE}" = *"version"* ]]; then
+        version_info
+        exit 0
+    fi
 fi
-
-if [[ "${IMAGE}" = *"version"* ]]; then
-    version_info
-    exit 0
-fi
-
-# IMAGE="admpresales/${IMAGE}.dockerapp"
 
 while [[ "$1" != "" ]]; do
     PARAM="$1"
@@ -319,26 +319,31 @@ while [[ "$1" != "" ]]; do
     esac
 done
 
-# aka is_apps_v2
-function apps_v2_check() {
-    local file="${1-$ENV_FILE}"
-    grep '^\s*#\s*v2\s*$' "$file" >/dev/null 2>&1
-}
-
-# Original record:
-#   something.dockerapp someorg/something:1.0
+# Ensure the apps.config file is initialized
 #
-# Desired record:
-#   someproject someorg something 1.0
-function apps_v2_upgrade() {
+# Also upgrades from v1 to v2 file format.
+# v2 includes project name, tries to eliminate extra .dockerapps, and is a bit easier to parse
+function apps_init() {
+    # If v2 file exists, nothing to do
+    if grep '^\s*#\s*v2\s*$' "$file" >/dev/null 2>&1; then
+        return
+    fi
+
+    local template="# v2"
     local file="${1-$ENV_FILE}"
     local tmp="${file}.tmp$$"
     local backup="${file}.v1-backup"
 
     local proj img repo tag
 
+    # Easy path, no file! Create it and return
+    if [[ ! -f "$file" ]]; then
+        echo $template > "$file"
+        return
+    fi
+
     mv "$file" "$tmp"
-    apps_v2_create
+    echo $template > "$file"
 
     while read proj img; do
         proj="${proj%.dockerapp}"
@@ -350,31 +355,31 @@ function apps_v2_upgrade() {
     mv "$tmp" "$backup"
 }
 
-function apps_v2_create() {
-    local file="${1-$ENV_FILE}"
+function apps_load() {
+    apps_init
 
-    echo '# v2' > "$file"
-
-# apps.config v2 format
-# <project> <organization> <image> <version>
-}
-
-function apps_v2_load() {
-    local file="${1-$ENV_FILE}"
+    local search="${1-$PROJECt}"
+    local file="${2-$ENV_FILE}"
     local entry proj repo img ver
 
-    entry="$(grep "^$IMAGE\b" "${file}")"
+    debug "Searching apps for: ${search}"
+
+    entry="$(grep "^${search}\b" "${file}")"
+
+    debug "Apps found: ${entry}"
 
     if [[ -n $entry ]]; then
         read proj repo img ver <<< $entry
 
         REPOSITORY="${REPOSITORY-$repo}"
         VERSION="${VERSION-$ver}"
-        IMAGE="$img"
+        IMAGE="${IMAGE-$img}"
     fi
 }
 
-function apps_v2_save() {
+function apps_save() {
+    apps_init
+
     local file="${1-$ENV_FILE}"
 
     debug "Saving: $PROJECT $REPOSITORY $IMAGE $VERSION"
@@ -386,15 +391,6 @@ function apps_v2_save() {
     echo $PROJECT $REPOSITORY $IMAGE $VERSION >> "$file"
 }
 
-if [[ -f "$ENV_FILE" ]]; then
-    if ! apps_v2_check; then
-        debug "Upgrading $ENV_FILE to v2 file format"
-        apps_v2_upgrade
-    fi
-else
-    apps_v2_create
-fi
-
 if [[ "$IMAGE" == */* ]]; then
     IFS=/ read REPOSITORY IMAGE <<< $IMAGE
 fi
@@ -403,11 +399,19 @@ if [[ "$IMAGE" == *:* ]]; then
     IFS=: read IMAGE VERSION <<< $IMAGE
 fi
 
-apps_v2_load
-
 #create a project name for the docker-compose based on the image name.
-if [[ -z ${PROJECT} ]]; then
-    PROJECT="$(basename $IMAGE .dockerapp)"
+if [[ -z $PROJECT ]]; then
+
+    if [[ -z $IMAGE ]]; then
+        echo "ERROR: Please specify an image or project name." >&2
+        exit 1;
+    fi
+
+    PROJECT="${IMAGE%.dockerapp}"
+fi
+
+if [[ -n $PROJECT ]]; then
+    apps_load "${PROJECT}"
 fi
 
 # Apply defaults if necessary
@@ -420,7 +424,10 @@ debug "Image: $IMAGE"
 debug "Version: $VERSION"
 debug "Project: $PROJECT"
 
-apps_v2_save
+if [[ -z $IMAGE ]]; then
+    echo "ERROR: Could not determine image name. Please specify an image or project name." >&2
+    exit 1
+fi
 
 if [[ -z "${COMPOSE_ACTION}" && -z "${DOCKERAPP_ACTION}" ]]; then
     output "You must specify a command"
@@ -436,6 +443,12 @@ COMPOSE_FILE="${COMPOSE_DIR}/${IMAGE}.yml"
 COMPOSE_BACKUP="${COMPOSE_FILE}.bk"
 
 if [[ -n "${DOCKERAPP_ACTION}" ]]; then
+    if ! docker login; then
+        rc=$?
+        output "Docker login failed ($rc)" >&2
+        exit $rc
+    fi
+
     if curl -s --connect-timeout "${NIMBUS_DOCKERHUB_TIMEOUT}" "${NIMBUS_DOCKERHUB_URL}" > /dev/null 2>&1; then
         DOCKERAPP_COMMAND="${DOCKERAPP_COMMAND} ${DOCKERAPP_ACTION} ${DOCKERAPP_ARGS} ${REPOSITORY}/${IMAGE}:${VERSION}"
 
@@ -506,5 +519,11 @@ fi
 if [[ -n "${COMPOSE_ACTION}" ]]; then
     COMPOSE_COMMAND="${COMPOSE_COMMAND} -p ${PROJECT} -f ${COMPOSE_FILE} ${COMPOSE_ACTION} ${COMPOSE_ARGS}"
     debug "Running: ${COMPOSE_COMMAND}"
-    eval "${COMPOSE_COMMAND}"
+    if ! eval "${COMPOSE_COMMAND}"; then
+        rc=$?
+        echo "Failed to run compose: $rc" >&2
+        exit $rc
+    fi
 fi
+
+apps_save
