@@ -82,7 +82,7 @@ function apps_load() {
 
     debug "Searching apps for: ${search}"
 
-    entry="$(grep "^${search}\b" "${file}")"
+    entry="$(grep "^${search}\s" "${file}")"
 
     debug "Apps found: ${entry}"
 
