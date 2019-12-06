@@ -510,6 +510,11 @@ if [[ -n "${DOCKERAPP_ACTION}" ]]; then
     fi # curl check
 fi
 
+if [[ ! -f "$COMPOSE_FILE" ]]; then
+    echo -e "${C_RED}ERROR${C_REG}: Could not find ${IMAGE}:${VERSION} (${PROJECT}) - do you need to create it with \`nimbusapp up'" >&2
+    exit 1
+fi
+
 if [[ "$COMPOSE_ACTION" == "down" && "$NIMBUS_FORCE" -eq 0 ]]; then
     if ! prompt_delete; then
         exit 1
