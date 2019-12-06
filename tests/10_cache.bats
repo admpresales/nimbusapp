@@ -54,3 +54,11 @@ function teardown() {
     grep "Docker Hub: 0.0.0.0:0 Timeout: 10" <<< $output
 }
 
+@test "Cache: No file" {
+
+    run "$NIMBUS_EXE" does-not-exist:1.0 start
+
+    (( status == 1 ))
+
+    grep "Could not find does-not-exist:1.0" <<< $output
+}

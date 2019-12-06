@@ -37,16 +37,76 @@ function version_info() {
     output "Released on $NIMBUS_RELEASE_DATE"
 }
 
-function product_exists(){
-    #if we find an entry, return 0 for success, else 1 for failure
-    local image="$(echo $IMAGE | cut -d'.' -f1 ).dockerapp"
-
-    if [[ $(grep "^${image}\b" ${ENV_FILE} -c) -eq 1 ]]
-    then
-        return 0
-    else
-        return 1
+# Ensure the apps.config file is initialized
+#
+# Also upgrades from v1 to v2 file format.
+# v2 includes project name, tries to eliminate extra .dockerapps, and is a bit easier to parse
+function apps_init() {
+    # If v2 file exists, nothing to do
+    if grep '^\s*#\s*v2\s*$' "$file" >/dev/null 2>&1; then
+        return
     fi
+
+    local template="# v2"
+    local file="${1-$ENV_FILE}"
+    local tmp="${file}.tmp$$"
+    local backup="${file}.v1-backup"
+
+    local proj img repo tag
+
+    # Easy path, no file! Create it and return
+    if [[ ! -f "$file" ]]; then
+        echo $template > "$file"
+        return
+    fi
+
+    mv "$file" "$tmp"
+    echo $template > "$file"
+
+    while read proj img; do
+        proj="${proj%.dockerapp}"
+        IFS=/: read repo img tag <<< $img
+
+        echo $proj $repo $img $tag
+    done < "$tmp" > "$file"
+
+    mv "$tmp" "$backup"
+}
+
+function apps_load() {
+    apps_init
+
+    local search="${1-$PROJECt}"
+    local file="${2-$ENV_FILE}"
+    local entry proj repo img ver
+
+    debug "Searching apps for: ${search}"
+
+    entry="$(grep "^${search}\s" "${file}")"
+
+    debug "Apps found: ${entry}"
+
+    if [[ -n $entry ]]; then
+        read proj repo img ver <<< $entry
+
+        REPOSITORY="${REPOSITORY-$repo}"
+        VERSION="${VERSION-$ver}"
+        IMAGE="${IMAGE-$img}"
+    fi
+}
+
+function apps_save() {
+    apps_init
+
+    local file="${1-$ENV_FILE}"
+
+    debug "Saving: $PROJECT $REPOSITORY $IMAGE $VERSION"
+
+    # Remove previous entry for this project
+    sed -i "/$PROJECT\b/d" "$file"
+
+    # Write new entry
+    echo $PROJECT $REPOSITORY $IMAGE $VERSION >> "$file"
 }
 
 # create folders to use for mount points
@@ -193,8 +253,9 @@ readonly NIMBUS_RELEASE_DATE="UNRELEASED"
 
 BASH_VERBOSE=""
 
-REPOSITORY="admpresales"
-VERSION="latest"
+DEFAULT_REPOSITORY="admpresales"
+DEFAULT_VERSION="latest"
+
 PROJECT=""
 VOLUME_MOUNT_IDEA=""
 VOLUME_MOUNT_M2=""
@@ -219,41 +280,24 @@ NETWORK_NAME="${NETWORK_NAME-demo-net}"
 NETWORK_SUBNET="${NETWORK_SUBNET-172.50.0.0/16}"
 NETWORK_GATEWAY="${NETWORK_GATEWAY-172.50.0.1}"
 
+PRESERVE_VOLUMES=0
+
 ENV_FILE="${NIMBUS_BASEDIR}/apps.config"
 
-IMAGE="$1"
+if [[ "$1" != "-"* ]]; then
+    IMAGE="$1"
 
-shift
-if [[ "${IMAGE}" = *"help"* ]]; then
-    usage
-    exit 0
-fi
+    shift
+    if [[ "${IMAGE}" = *"help"* ]]; then
+        usage
+        exit 0
+    fi
 
-if [[ "${IMAGE}" = *"version"* ]]; then
-    version_info
-    exit 0
-fi
-
-if [[ "$IMAGE" == *\/* ]]; then
-    REPOSITORY=$(echo $IMAGE | cut -d'/' -f1 )
-    IMAGE=$(echo $IMAGE | cut -d'/' -f2 )
-fi
-
-if [[ "$IMAGE" == *:* ]]; then
-    VERSION=$(echo $IMAGE | cut -d':' -f2 )
-    IMAGE=$(echo $IMAGE | cut -d':' -f1 )
-elif [[ -e $ENV_FILE ]]; then
-    if product_exists; then
-        #ensuring uniform comparision since someone could pass intillij or intellij.dockerapp
-        IMAGE=$(echo $IMAGE | cut -d'.' -f1 )".dockerapp"
-        VERSION=$(grep "^${IMAGE}\b" ${ENV_FILE} | cut -d':' -f2 )
-        output "Using ${IMAGE}:${VERSION} version found in ${ENV_FILE}"
-    else
-        output "Not able to find ${IMAGE} in ${ENV_FILE}.  Will attempt to start using ${IMAGE}:${VERSION}"
+    if [[ "${IMAGE}" = *"version"* ]]; then
+        version_info
+        exit 0
     fi
 fi
-
-# IMAGE="admpresales/${IMAGE}.dockerapp"
 
 while [[ "$1" != "" ]]; do
     PARAM="$1"
@@ -279,6 +323,7 @@ while [[ "$1" != "" ]]; do
         append_dockerapp_arg "$PARAM" "$VALUE"
         shift 2
         ;;
+    # TODO: Intellij checks should happen after image parsing
     -v)
          # check to see if intellij is being called.
         if [[ "${IMAGE}" == *intellij* ]]
@@ -312,20 +357,36 @@ while [[ "$1" != "" ]]; do
         NIMBUS_FORCE=1
         shift
         ;;
+    --preserve-volumes)
+        PRESERVE_VOLUMES=1
+        shift
+        ;;
     render|inspect)
         DOCKERAPP_ACTION="${PARAM}"
         shift
         break
         ;;
-    down | start | stop | ps | rm | logs | restart | pull )
-        DOCKERAPP_ACTION="render"
+    down | start | stop | ps | rm | logs | restart )
         COMPOSE_ACTION="${PARAM}"
+        shift
+        break
+        ;;
+    pull)
+        DOCKERAPP_ACTION="render"
+        COMPOSE_ACTION="pull"
         shift
         break
         ;;
     up)
         DOCKERAPP_ACTION="render"
-        COMPOSE_ACTION="up -d"
+        
+        # Start in background if required
+        if [[ "$@" == *"--no-start"* ]]; then
+            COMPOSE_ACTION="up"
+        else 
+            COMPOSE_ACTION="up -d"
+        fi
+
         shift
         break
         ;;
@@ -336,6 +397,44 @@ while [[ "$1" != "" ]]; do
     esac
 done
 
+if [[ "$IMAGE" == */* ]]; then
+    IFS=/ read REPOSITORY IMAGE <<< $IMAGE
+fi
+
+if [[ "$IMAGE" == *:* ]]; then
+    IFS=: read IMAGE VERSION <<< $IMAGE
+fi
+
+#create a project name for the docker-compose based on the image name.
+if [[ -z $PROJECT ]]; then
+
+    if [[ -z $IMAGE ]]; then
+        echo "ERROR: Please specify an image or project name." >&2
+        exit 1;
+    fi
+
+    PROJECT="${IMAGE%.dockerapp}"
+fi
+
+if [[ -n $PROJECT ]]; then
+    apps_load "${PROJECT}"
+fi
+
+# Apply defaults if necessary
+REPOSITORY="${REPOSITORY-$DEFAULT_REPOSITORY}"
+VERSION="${VERSION-$DEFAULT_VERSION}"
+IMAGE="${IMAGE%.dockerapp}"
+
+debug "Repository: $REPOSITORY"
+debug "Image: $IMAGE"
+debug "Version: $VERSION"
+debug "Project: $PROJECT"
+
+if [[ -z $IMAGE ]]; then
+    echo "ERROR: Could not determine image name. Please specify an image or project name." >&2
+    exit 1
+fi
+
 if [[ -z "${COMPOSE_ACTION}" && -z "${DOCKERAPP_ACTION}" ]]; then
     output "You must specify a command"
     usage
@@ -344,18 +443,18 @@ fi
 
 create_network
 
-#create a project name for the docker-compose based on the image name.
-if [[ -z ${PROJECT} ]]; then
-    PROJECT="$(basename $IMAGE .dockerapp)"
-fi
-
 COMPOSE_ARGS="$@"
 COMPOSE_DIR="${NIMBUS_BASEDIR}/cache/${PROJECT}/${REPOSITORY}/${IMAGE}/${VERSION}"
 COMPOSE_FILE="${COMPOSE_DIR}/${IMAGE}.yml"
 COMPOSE_BACKUP="${COMPOSE_FILE}.bk"
 
-
 if [[ -n "${DOCKERAPP_ACTION}" ]]; then
+    if ! docker login; then
+        rc=$?
+        output "Docker login failed ($rc)" >&2
+        exit $rc
+    fi
+
     if curl -s --connect-timeout "${NIMBUS_DOCKERHUB_TIMEOUT}" "${NIMBUS_DOCKERHUB_URL}" > /dev/null 2>&1; then
         DOCKERAPP_COMMAND="${DOCKERAPP_COMMAND} ${DOCKERAPP_ACTION} ${DOCKERAPP_ARGS} ${REPOSITORY}/${IMAGE}:${VERSION}"
 
@@ -411,6 +510,11 @@ if [[ -n "${DOCKERAPP_ACTION}" ]]; then
     fi # curl check
 fi
 
+if [[ ! -f "$COMPOSE_FILE" ]]; then
+    echo -e "${C_RED}ERROR${C_REG}: Could not find ${IMAGE}:${VERSION} (${PROJECT}) - do you need to create it with \`nimbusapp up'" >&2
+    exit 1
+fi
+
 if [[ "$COMPOSE_ACTION" == "down" && "$NIMBUS_FORCE" -eq 0 ]]; then
     if ! prompt_delete; then
         exit 1
@@ -424,7 +528,23 @@ if [[ "$COMPOSE_ACTION" == "up -d" && "$NIMBUS_FORCE" -eq 0 ]]; then
 fi
 
 if [[ -n "${COMPOSE_ACTION}" ]]; then
+    if [[ $COMPOSE_ACTION == *"up"* && $PRESERVE_VOLUMES -eq 0 ]]; then
+        COMPOSE_ARGS="$COMPOSE_ARGS -V"
+    fi
+
+    if [[ $COMPOSE_ACTION == *"down"* && $PRESERVE_VOLUMES -eq 0 ]]; then
+        COMPOSE_ARGS="$COMPOSE_ARGS -v"
+    fi
+
     COMPOSE_COMMAND="${COMPOSE_COMMAND} -p ${PROJECT} -f ${COMPOSE_FILE} ${COMPOSE_ACTION} ${COMPOSE_ARGS}"
+
     debug "Running: ${COMPOSE_COMMAND}"
-    eval "${COMPOSE_COMMAND}"
+
+    if ! eval "${COMPOSE_COMMAND}"; then
+        rc=$?
+        echo "Failed to run compose: $rc" >&2
+        exit $rc
+    fi
 fi
+
+apps_save
