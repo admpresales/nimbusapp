@@ -254,7 +254,6 @@ readonly NIMBUS_RELEASE_DATE="UNRELEASED"
 BASH_VERBOSE=""
 
 DEFAULT_REPOSITORY="admpresales"
-DEFAULT_VERSION="latest"
 
 PROJECT=""
 VOLUME_MOUNT_IDEA=""
@@ -420,9 +419,19 @@ if [[ -n $PROJECT ]]; then
     apps_load "${PROJECT}"
 fi
 
+
+if [[ -z $VERSION ]]; then
+    echo "No version number specified!" >&2
+    echo >&2
+    echo "If this is your first time using $IMAGE, please specify a version number:" >&2
+    echo "    $0 $IMAGE:<version_number> ${COMPOSE_ACTION:-$DOCKERAPP_ACTION}" >&2
+    echo >&2
+    echo "The version number you choose will be remembered for future commands." >&2
+    exit 1
+fi
+
 # Apply defaults if necessary
 REPOSITORY="${REPOSITORY-$DEFAULT_REPOSITORY}"
-VERSION="${VERSION-$DEFAULT_VERSION}"
 IMAGE="${IMAGE%.dockerapp}"
 
 debug "Repository: $REPOSITORY"
