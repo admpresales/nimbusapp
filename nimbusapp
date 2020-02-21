@@ -548,7 +548,7 @@ if [[ -n "${DOCKERAPP_ACTION}" ]]; then
             error "Could not render"
 
             if [[ "${VERSION}" == *"_"* ]]; then
-                warn "Image name contains an underscore which is  not used by nimbusapp." \
+                warn "Image name contains an underscore which is not used by nimbusapp." \
                     "Try using ${REPOSITORY}/${IMAGE}:${VERSION%%_*} instead"
             fi
 
