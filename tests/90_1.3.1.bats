@@ -21,7 +21,7 @@ function teardown() {
     fi
 }
 
-@test "Logging" {
+@test "v1.3.1: Logging" {
     local logFile="$NIMBUS_BASEDIR/nimbusapp.log"
     local num="$RANDOM"
 
@@ -41,7 +41,7 @@ function teardown() {
     grep "DEBUG - Project: nimbusapp-test" $logFile
 }
 
-@test "No Version Message" {
+@test "v1.3.1: No Version Message" {
     run "$NIMBUS_EXE" "some_image" -f up
 
     (( status != 0 ))
@@ -50,7 +50,7 @@ function teardown() {
     assert_output_contains "If this is your first time using some_image, please specify a version number"
 }
 
-@test "Underscore Error" {
+@test "v1.3.1: Underscore Error" {
     run "$NIMBUS_EXE" "octane:test_wrong" -f up
 
     (( status != 0 ))
