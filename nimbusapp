@@ -165,7 +165,7 @@ prompt_delete() {
     output "" \
         "${C_BOLD}This action will ${C_BOLD}${C_RED}DELETE${C_REG} your containers and is ${C_BOLD}${C_RED}IRREVERSIBLE${C_RESET}!" \
         "" \
-        "${C_BOLD}You may wish to use ${C_RESET}\`nimbusapp ... stop'${C_BOLD} to shut down your containers without deleting them${C_RESET}" \
+        "${C_BOLD}You may wish to use ${C_RESET}\`nimbusapp ${REPOSITORY}/${IMAGE}:${VERSION} stop'${C_BOLD} to shut down your containers without deleting them${C_RESET}" \
         "" \
         "${C_BOLD}The following containers will be deleted:${C_RESET}"
 
@@ -185,7 +185,7 @@ prompt_recreate() {
             "" \
             "${C_BOLD}Recreating containers is normal when changing their configuration, such as image, tag and ports.${C_RESET}" \
             "" \
-            "${C_BOLD}You may wish to use ${C_RESET}\`nimbusapp ... start'${C_BOLD} to start your existing containers.${C_RESET}" \
+            "${C_BOLD}You may wish to use ${C_RESET}\`nimbusapp ${REPOSITORY}/${IMAGE}:${VERSION} start'${C_BOLD} to start your existing containers.${C_RESET}" \
             "" \
             "${C_BOLD}The following containers will be recreated:${C_RESET}"
 
@@ -479,7 +479,6 @@ if [[ -n $PROJECT ]]; then
     apps_load "${PROJECT}"
 fi
 
-
 if [[ -z $VERSION ]]; then
     fatal "No version number specified!" \
         "" \
@@ -493,13 +492,10 @@ fi
 REPOSITORY="${REPOSITORY-$DEFAULT_REPOSITORY}"
 IMAGE="${IMAGE%.dockerapp}"
 
-debug "Repository: $REPOSITORY"
-debug "Image: $IMAGE"
-debug "Version: $VERSION"
-debug "Project: $PROJECT"
+output "${PROJECT}: Using $REPOSITORY/$IMAGE:$VERSION"
 
 if [[ -z $IMAGE ]]; then
-    fatal "Could not determine image name. Please specify an image or project name." >&2
+    fatal "Could not determine image name. Please specify an image or project name."
 fi
 
 if [[ -z "${COMPOSE_ACTION}" && -z "${DOCKERAPP_ACTION}" ]]; then
@@ -571,7 +567,7 @@ if [[ -n "${DOCKERAPP_ACTION}" ]]; then
         fi
     else # curl check
         if [[ ! -f "${COMPOSE_FILE}" ]]; then
-            fatal "ERROR: No connection to Docker Hub: ${NIMBUS_DOCKERHUB_URL} (${NIMBUS_DOCKERHUB_TIMEOUT}s)"
+            fatal "No connection to Docker Hub: ${NIMBUS_DOCKERHUB_URL} (${NIMBUS_DOCKERHUB_TIMEOUT}s)"
         else
             output "No connection to Docker Hub, using cached file!"
             debug "Docker Hub: ${NIMBUS_DOCKERHUB_URL} Timeout: ${NIMBUS_DOCKERHUB_TIMEOUT}"
@@ -590,7 +586,7 @@ if [[ "$COMPOSE_ACTION" == "down" && "$NIMBUS_FORCE" -eq 0 ]]; then
     fi
 fi
 
-if [[ "$COMPOSE_ACTION" == "up -d" && "$NIMBUS_FORCE" -eq 0 ]]; then
+if [[ "$COMPOSE_ACTION" == "up"* && "$NIMBUS_FORCE" -eq 0 && "$COMPOSE_ARGS" != *"--force-recreate"* ]]; then
     if ! check_recreate; then
         exit 1
     fi
@@ -609,7 +605,7 @@ if [[ -n "${COMPOSE_ACTION}" ]]; then
 
     debug "Running: ${COMPOSE_COMMAND}"
 
-    if ! eval "${COMPOSE_COMMAND}"; then
+    if ! eval "${COMPOSE_COMMAND} 2>&1 | tee -a '$NIMBUS_LOG_FILE'"; then
         rc=$?
         error "Failed to run compose: $rc"
         exit $rc

@@ -31,14 +31,11 @@ function teardown() {
     
     cat "$logFile"
 
-    grep "CMD - .* $TEST_IMAGE -s MESSAGE=$num -f up" $logFile
+    grep "CMD - .* $TEST_IMAGE -s MESSAGE=$num -f up" "$logFile"
     
-    grep "DEBUG - -s MESSAGE=$num" $logFile
+    grep "DEBUG - -s MESSAGE=$num" "$logFile"
 
-    grep "DEBUG - Repository: admpresales" $logFile
-    grep "DEBUG - Image: nimbusapp-test" $logFile
-    grep "DEBUG - Version: 0.1.0" $logFile
-    grep "DEBUG - Project: nimbusapp-test" $logFile
+    grep "INFO - nimbusapp-test: Using admpresales/nimbusapp-test:0.1.0" "$logFile"
 }
 
 @test "v1.3.1: No Version Message" {
