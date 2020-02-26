@@ -293,6 +293,8 @@ function log() {
     shift
     local timeStamp="$(date "+%Y-%m-%d %H:%M:%S")"
 
+    mkdir -p "$(dirname $NIMBUS_LOG_FILE)"
+
     for line in "$@"; do
         if [[ -n "$line" ]]; then
             echo -e "[$timeStamp] $level - $line" >> "$NIMBUS_LOG_FILE"
@@ -492,10 +494,14 @@ fi
 REPOSITORY="${REPOSITORY-$DEFAULT_REPOSITORY}"
 IMAGE="${IMAGE%.dockerapp}"
 
-output "${PROJECT}: Using $REPOSITORY/$IMAGE:$VERSION"
-
 if [[ -z $IMAGE ]]; then
     fatal "Could not determine image name. Please specify an image or project name."
+fi
+
+if [[ "$PROJECT" == "$IMAGE" ]]; then
+    output "Using ${REPOSITORY}/${IMAGE}.dockerapp:${VERSION}" ""
+else
+    output "Using ${REPOSITORY}/${IMAGE}.dockerapp:${VERSION} (${PROJECT})" ""
 fi
 
 if [[ -z "${COMPOSE_ACTION}" && -z "${DOCKERAPP_ACTION}" ]]; then
