@@ -6,34 +6,44 @@ function usage()
         error "$@" ""
     fi
 
-    output "Usage: nimbusapp <IMAGE>:<VERSION> [OPTIONS] COMMAND" \
-            "" \
-            "Options:" \
-            "  IMAGE       The Docker App file you wish to run. If no repository is provided, admpresales is assumed." \
-            "              dockerapp is added if not explicitly stated." \
-            "  VERSION     The version of the Docker App file you wish to run." \
-            "  -s, --set   Enables you to set(override) default arguments" \
-            "  -v          Mounts volume for IdeaProject in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS" \
-            "  -m          Mounts volume for .m2 in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS" \
-            "  -p          Docker-compose project name to use - EXPERIMENTAL NOT RECOMMENDED FOR CASUAL USERS" \
-            "  -d, --debug Enable debugging output (use twice for verbose bash commands)" \
-            "  -f, --force Skip all prompts - Use with caution, this option will happily delete your data without warning" \
-            "  --version   Print the version of nimbusapp and exit" \
-            "" \
-            "Commands:" \
-            "  down     Stop and remove containers" \
-            "  inspect  Shows metadata and settings for a given application" \
-            "  logs     Shows logs for containers" \
-            "  ps       Lists containers" \
-            "  pull     Pull service images" \
-            "  render   Render the Compose file for the application" \
-            "  rm       Remove stopped containers" \
-            "  restart  Restart containers" \
-            "  start    Start existing containers" \
-            "  stop     Stop existing containers" \
-            "  up       Creates and start containers" \
-            "  version  Prints version information" \
-            "  help     Prints this help message"
+    cat <<USAGE_EOF >&2
+Usage: nimbusapp <IMAGE>[:<VERSION>] [OPTIONS] COMMAND [CMD OPTIONS]
+
+Options:
+  IMAGE       The Docker App file you wish to run. If no repository is provided, admpresales is assumed.
+  VERSION     The version of the Docker App file you wish to run.
+              Only required the first time a container is created, and will be cached for future use.
+  -d, --debug Enable debugging output (use twice for verbose bash commands)
+  -f, --force Skip all prompts - Use with caution, this option will happily delete your data without warning
+  -s, --set   Enables you to set(override) default arguments
+  --version   Print the version of nimbusapp and exit
+
+Commands:
+  down     Stop and remove containers
+  help     Prints this help message
+  inspect  Shows metadata and settings for a given application
+  logs     Shows logs for containers
+  ps       Lists containers
+  pull     Pull service images
+  render   Render the Compose file for the application
+  rm       Remove stopped containers
+  restart  Restart containers
+  start    Start existing containers
+  stop     Stop existing containers
+  up       Creates and start containers
+  version  Prints version information  
+  
+Experimental/Advanced Options:  
+  -v    Mounts volume for IdeaProject in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS
+  -m    Mounts volume for .m2 in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS
+  -p    Docker-compose project name to use, allows running multiple versions of the same image
+  --preserve-volumes    Do not recreate anonymous volumes
+
+Command Options:
+  up    --no-start       Create containers without starting them
+        --force-recreate Force all containers to be re-created
+        --no-recreate    Do not allow any containers to be re-created
+USAGE_EOF
 
     if [[ -n "$@" ]]; then
         exit 1
