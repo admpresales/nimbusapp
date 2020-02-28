@@ -35,7 +35,7 @@ function teardown() {
     
     grep "DEBUG - -s MESSAGE=$num" "$logFile"
 
-    grep "INFO - nimbusapp-test: Using admpresales/nimbusapp-test:0.1.0" "$logFile"
+    grep "INFO - Using admpresales/nimbusapp-test.dockerapp:0.1.0" "$logFile"
 }
 
 @test "v1.3.1: No Version Message" {
