@@ -2,34 +2,54 @@
 
 function usage()
 {
-    output "Usage: nimbusapp <IMAGE>:<VERSION> [OPTIONS] COMMAND"
-    output -e ""
-    output -e "Options:"
-    output -e "  IMAGE       The Docker App file you wish to run. If no repository is provided, admpresales is assumed."
-    output -e "              dockerapp is added if not explicitly stated."
-    output -e "  VERSION     The version of the Docker App file you wish to run."
-    output -e "  -s, --set   Enables you to set(override) default arguments"
-    output -e "  -v          Mounts volume for IdeaProject in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS"
-    output -e "  -m          Mounts volume for .m2 in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS"
-    output -e "  -p          Docker-compose project name to use - EXPERIMENTAL NOT RECOMMENDED FOR CASUAL USERS"
-    output -e "  -d, --debug Enable debugging output (use twice for verbose bash commands)"
-    output -e "  -f, --force Skip all prompts - Use with caution, this option will happily delete your data without warning"
-    output -e "  --version   Print the version of nimbusapp and exit"
-    output -e ""
-    output -e "Commands:"
-    output -e "  down     Stop and remove containers"
-    output -e "  inspect  Shows metadata and settings for a given application"
-    output -e "  logs     Shows logs for containers"
-    output -e "  ps       Lists containers"
-    output -e "  pull     Pull service images"
-    output -e "  render   Render the Compose file for the application"
-    output -e "  rm       Remove stopped containers"
-    output -e "  restart  Restart containers"
-    output -e "  start    Start existing containers"
-    output -e "  stop     Stop existing containers"
-    output -e "  up       Creates and start containers"
-    output -e "  version  Prints version information"
-    output -e "  help     Prints this help message"
+    if [[ -n "$@" ]]; then
+        error "$@" ""
+    fi
+
+    cat <<USAGE_EOF >&2
+Usage: nimbusapp <IMAGE>[:<VERSION>] [OPTIONS] COMMAND [CMD OPTIONS]
+
+Options:
+  IMAGE       The Docker App file you wish to run. If no repository is provided, admpresales is assumed.
+  VERSION     The version of the Docker App file you wish to run.
+              Only required the first time a container is created, and will be cached for future use.
+  -d, --debug Enable debugging output (use twice for verbose bash commands)
+  -f, --force Skip all prompts - Use with caution, this option will happily delete your data without warning
+  -s, --set   Enables you to set(override) default arguments
+  --version   Print the version of nimbusapp and exit
+
+Commands:
+  down     Stop and remove containers
+  help     Prints this help message
+  inspect  Shows metadata and settings for a given application
+  logs     Shows logs for containers
+  ps       Lists containers
+  pull     Pull service images
+  render   Render the Compose file for the application
+  rm       Remove stopped containers
+  restart  Restart containers
+  start    Start existing containers
+  stop     Stop existing containers
+  up       Creates and start containers
+  version  Prints version information  
+  
+Experimental/Advanced Options:  
+  -v    Mounts volume for IdeaProject in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS
+  -m    Mounts volume for .m2 in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS
+  -p    Docker-compose project name to use, allows running multiple versions of the same image
+  --preserve-volumes    Do not recreate anonymous volumes
+
+Command Options:
+  up    --no-start       Create containers without starting them
+        --force-recreate Force all containers to be re-created
+        --no-recreate    Do not allow any containers to be re-created
+USAGE_EOF
+
+    if [[ -n "$@" ]]; then
+        exit 1
+    else
+        exit 0
+    fi
 }
 
 function version_info() {
@@ -65,7 +85,7 @@ function apps_init() {
 
     while read proj img; do
         proj="${proj%.dockerapp}"
-        IFS=/: read repo img tag <<< $img
+        IFS=/: read repo img tag <<< "$img"
 
         echo $proj $repo $img $tag
     done < "$tmp" > "$file"
@@ -87,7 +107,7 @@ function apps_load() {
     debug "Apps found: ${entry}"
 
     if [[ -n $entry ]]; then
-        read proj repo img ver <<< $entry
+        read proj repo img ver <<< "$entry"
 
         REPOSITORY="${REPOSITORY-$repo}"
         VERSION="${VERSION-$ver}"
@@ -128,7 +148,7 @@ function prompt_yn() {
     local PROMPT_TEXT=$"${1-Continue?} [y/n]"
     local USER_ANSWER
 
-    echo -ne "${PROMPT_TEXT} "
+    echo -ne "${PROMPT_TEXT} " >&2
 
     while read USER_ANSWER; do
         case "${USER_ANSWER}" in
@@ -140,48 +160,51 @@ function prompt_yn() {
             ;;
         esac
 
-        echo -ne "${PROMPT_TEXT} "
+        echo -ne "${PROMPT_TEXT} " >&2
     done
 }
 
 # Colour codes
 readonly C_REG="\e[39m"     # Regular colour
 readonly C_BOLD="\e[1m"     # Bold font
-readonly C_RED="\e[91m"     # Red colour
+readonly C_RED="\e[31m"     # Red colour
 readonly C_RESET="\e[0m"    # Reset font and colour
+readonly C_YELLOW="\e[33m"    # Yellow colour
 
 prompt_delete() {
-    echo
-    echo -e "${C_BOLD}This action will ${C_BOLD}${C_RED}DELETE${C_REG} your containers and is ${C_BOLD}${C_RED}IRREVERSIBLE${C_RESET}!"
-    echo
-    echo -e "${C_BOLD}You may wish to use ${C_RESET}\`nimbusapp ... stop'${C_BOLD} to shut down your containers without deleting them${C_RESET}"
-    echo
-    echo -e "${C_BOLD}The following containers will be deleted:${C_RESET}"
+    output "" \
+        "${C_BOLD}This action will ${C_BOLD}${C_RED}DELETE${C_REG} your containers and is ${C_BOLD}${C_RED}IRREVERSIBLE${C_RESET}!" \
+        "" \
+        "${C_BOLD}You may wish to use ${C_RESET}\`nimbusapp ${REPOSITORY}/${IMAGE}:${VERSION} stop'${C_BOLD} to shut down your containers without deleting them${C_RESET}" \
+        "" \
+        "${C_BOLD}The following containers will be deleted:${C_RESET}"
 
     docker-compose -p "${PROJECT}" -f "$COMPOSE_FILE" ps -q | while read id; do
-        docker inspect --format "- {{.Name}}" "$id"
+        docker inspect --format "- {{.Name}}" "$id" >&2
     done
-    echo
+
+    output ""
 
     prompt_yn "${C_BOLD}${C_RED}Do you wish to DELETE these containers?${C_RESET}"
     return $?
 }
 
 prompt_recreate() {
-    echo
-    echo -e "${C_BOLD}This action will cause one or more of your containers to be ${C_RED}DELETED${C_REG} and ${C_RED}RECREATED${C_REG}.${C_RESET}"
-    echo
-    echo -e "${C_BOLD}Recreating containers is normal when changing their configuration, such as image, tag and ports.${C_RESET}"
-    echo
-    echo -e "${C_BOLD}You may wish to use ${C_RESET}\`nimbusapp ... start'${C_BOLD} to start your existing containers.${C_RESET}"
-    echo
-    echo -e "${C_BOLD}The following containers will be recreated:${C_RESET}"
+    output  "" \
+            "${C_BOLD}This action will cause one or more of your containers to be ${C_RED}DELETED${C_REG} and ${C_RED}RECREATED${C_REG}.${C_RESET}" \
+            "" \
+            "${C_BOLD}Recreating containers is normal when changing their configuration, such as image, tag and ports.${C_RESET}" \
+            "" \
+            "${C_BOLD}You may wish to use ${C_RESET}\`nimbusapp ${REPOSITORY}/${IMAGE}:${VERSION} start'${C_BOLD} to start your existing containers.${C_RESET}" \
+            "" \
+            "${C_BOLD}The following containers will be recreated:${C_RESET}"
 
     for c in "$@"; do
-        echo "- $c"
+        output "- $c"
     done
     
-    echo
+    output ""
+
     prompt_yn "${C_BOLD}${C_RED}Recreate the listed containers?${C_RESET}"
     return $?
 }
@@ -224,7 +247,9 @@ function append_dockerapp_arg() {
     local var
     local val
 
-    IFS== read var val <<< $2
+    IFS== read var val <<< "$2"
+
+    debug "$opt $var=$val"
 
     DOCKERAPP_ARGS="${DOCKERAPP_ARGS} ${opt} '${var}=\"${val}\"'"
     # DOCKERAPP_ARGS="${DOCKERAPP_ARGS} ${opt} ${var}=${val}"
@@ -236,17 +261,64 @@ function create_network() {
     fi
 }
 
+function _output() {
+    for line in "$@"; do
+        echo -e "$line" >&2
+    done
+}
+
 function debug() {
     if (( NIMBUS_DEBUG > 0 )); then
-        echo "$@"
+        _output "$@"
     fi
+    log "DEBUG" "$@"
 }
 
 function output() {
     if (( NIMBUS_OUTPUT > 0 )); then
-        echo "$@"
+        _output "$@"
     fi
+    log "INFO" "$@"
 }
+
+function warn() {
+    echo -ne "${C_BOLD}${C_YELLOW}WARNING:${C_RESET} " >&2
+    _output "$@"
+    log "WARN" "$@"
+}
+
+function error() {
+    echo -ne "${C_BOLD}${C_RED}ERROR:${C_RESET} " >&2
+    _output "$@"
+    log "ERROR" "$@"
+}
+
+function fatal() {
+    error "$@"
+    exit 1
+}
+
+function log() {
+    local level="$1"
+    shift
+    local timeStamp="$(date "+%Y-%m-%d %H:%M:%S")"
+
+    mkdir -p "$(dirname $NIMBUS_LOG_FILE)"
+
+    for line in "$@"; do
+        if [[ -n "$line" ]]; then
+            echo -e "[$timeStamp] $level - $line" >> "$NIMBUS_LOG_FILE"
+        fi
+    done
+}
+
+function log_prune() {
+    local tmpFile="${NIMBUS_LOG_FILE}.tmp"
+
+    tail -n $NIMBUS_LOG_LINES "$NIMBUS_LOG_FILE" > "$tmpFile"
+    mv -f "$tmpFile" "$NIMBUS_LOG_FILE"
+}
+
 
 readonly NIMBUS_RELEASE_VERSION="UNRELEASED"
 readonly NIMBUS_RELEASE_DATE="UNRELEASED"
@@ -254,7 +326,6 @@ readonly NIMBUS_RELEASE_DATE="UNRELEASED"
 BASH_VERBOSE=""
 
 DEFAULT_REPOSITORY="admpresales"
-DEFAULT_VERSION="latest"
 
 PROJECT=""
 VOLUME_MOUNT_IDEA=""
@@ -284,13 +355,17 @@ PRESERVE_VOLUMES=0
 
 ENV_FILE="${NIMBUS_BASEDIR}/apps.config"
 
+NIMBUS_LOG_FILE="${NIMBUS_LOG_FILE-${NIMBUS_BASEDIR}/nimbusapp.log}"
+NIMBUS_LOG_LINES=10000
+
+log "CMD" "$0 $*"
+
 if [[ "$1" != "-"* ]]; then
     IMAGE="$1"
 
     shift
     if [[ "${IMAGE}" = *"help"* ]]; then
         usage
-        exit 0
     fi
 
     if [[ "${IMAGE}" = *"version"* ]]; then
@@ -306,7 +381,6 @@ while [[ "$1" != "" ]]; do
     case "$PARAM" in
     -h | --help | help)
         usage
-        exit 0
         ;;
     --version)
         version_info
@@ -332,7 +406,7 @@ while [[ "$1" != "" ]]; do
             VOLUME_MOUNT_IDEA="\ \ \ \ - type: bind\n\ \ \ \ \ \ source: ${HOME}\/${IDEA}\n\ \ \ \ \ \ target: \/home\/demo/\/IdeaProjects"
             create_intellij_mount_points
         else
-            output "The '-v' option is only available with Intellij at this time.  Ignoring."
+            warn "The '-v' option is only available with Intellij at this time.  Ignoring."
         fi
         shift
         ;;
@@ -344,7 +418,7 @@ while [[ "$1" != "" ]]; do
             VOLUME_MOUNT_M2="\ \ \ \ - type: bind\n\ \ \ \ \ \ source: ${HOME}\/\.m2\n\ \ \ \ \ \ target: \/home\/demo\/\.m2"
             create_intellij_mount_points
         else
-            output "The '-m' option is only available with Intellij at this time.  Ignoring."
+            warn "The '-m' option is only available with Intellij at this time.  Ignoring."
         fi
         shift
         ;;
@@ -391,26 +465,23 @@ while [[ "$1" != "" ]]; do
         break
         ;;
     *)
-        output "Invalid argument passed: $1"
-        usage
-        exit 1
+        usage "Invalid argument passed: $1"
     esac
 done
 
 if [[ "$IMAGE" == */* ]]; then
-    IFS=/ read REPOSITORY IMAGE <<< $IMAGE
+    IFS=/ read REPOSITORY IMAGE <<< "$IMAGE"
 fi
 
 if [[ "$IMAGE" == *:* ]]; then
-    IFS=: read IMAGE VERSION <<< $IMAGE
+    IFS=: read IMAGE VERSION <<< "$IMAGE"
 fi
 
 #create a project name for the docker-compose based on the image name.
 if [[ -z $PROJECT ]]; then
 
     if [[ -z $IMAGE ]]; then
-        echo "ERROR: Please specify an image or project name." >&2
-        exit 1;
+        usage "Please specify an image or project name."
     fi
 
     PROJECT="${IMAGE%.dockerapp}"
@@ -420,25 +491,31 @@ if [[ -n $PROJECT ]]; then
     apps_load "${PROJECT}"
 fi
 
+if [[ -z $VERSION ]]; then
+    fatal "No version number specified!" \
+        "" \
+        "If this is your first time using $IMAGE, please specify a version number:" \
+            "\t$0 $IMAGE:<version_number> ${COMPOSE_ACTION:-$DOCKERAPP_ACTION}" \
+        "" \
+        "The version number you choose will be remembered for future commands."
+fi
+
 # Apply defaults if necessary
 REPOSITORY="${REPOSITORY-$DEFAULT_REPOSITORY}"
-VERSION="${VERSION-$DEFAULT_VERSION}"
 IMAGE="${IMAGE%.dockerapp}"
 
-debug "Repository: $REPOSITORY"
-debug "Image: $IMAGE"
-debug "Version: $VERSION"
-debug "Project: $PROJECT"
-
 if [[ -z $IMAGE ]]; then
-    echo "ERROR: Could not determine image name. Please specify an image or project name." >&2
-    exit 1
+    fatal "Could not determine image name. Please specify an image or project name."
+fi
+
+if [[ "$PROJECT" == "$IMAGE" ]]; then
+    output "Using ${REPOSITORY}/${IMAGE}.dockerapp:${VERSION}" ""
+else
+    output "Using ${REPOSITORY}/${IMAGE}.dockerapp:${VERSION} (${PROJECT})" ""
 fi
 
 if [[ -z "${COMPOSE_ACTION}" && -z "${DOCKERAPP_ACTION}" ]]; then
-    output "You must specify a command"
-    usage
-    exit 1
+    usage "You must specify a command"
 fi
 
 create_network
@@ -449,9 +526,9 @@ COMPOSE_FILE="${COMPOSE_DIR}/${IMAGE}.yml"
 COMPOSE_BACKUP="${COMPOSE_FILE}.bk"
 
 if [[ -n "${DOCKERAPP_ACTION}" ]]; then
-    if ! docker login; then
+    if ! docker login >&2; then
         rc=$?
-        output "Docker login failed ($rc)" >&2
+        error "Docker login failed ($rc)"
         exit $rc
     fi
 
@@ -480,7 +557,13 @@ if [[ -n "${DOCKERAPP_ACTION}" ]]; then
                 mv -f ${BASH_VERBOSE} "${COMPOSE_BACKUP}" "${COMPOSE_FILE}"
             fi
 
-            output "ERROR: Could not render" >&2
+            error "Could not render"
+
+            if [[ "${VERSION}" == *"_"* ]]; then
+                warn "Image name contains an underscore which is not used by nimbusapp." \
+                    "Try using ${REPOSITORY}/${IMAGE}:${VERSION%%_*} instead"
+            fi
+
             exit 1
         fi # eval
 
@@ -500,8 +583,7 @@ if [[ -n "${DOCKERAPP_ACTION}" ]]; then
         fi
     else # curl check
         if [[ ! -f "${COMPOSE_FILE}" ]]; then
-            output "ERROR: No connection to Docker Hub: ${NIMBUS_DOCKERHUB_URL} (${NIMBUS_DOCKERHUB_TIMEOUT}s)" >&2
-            exit 1
+            fatal "No connection to Docker Hub: ${NIMBUS_DOCKERHUB_URL} (${NIMBUS_DOCKERHUB_TIMEOUT}s)"
         else
             output "No connection to Docker Hub, using cached file!"
             debug "Docker Hub: ${NIMBUS_DOCKERHUB_URL} Timeout: ${NIMBUS_DOCKERHUB_TIMEOUT}"
@@ -511,8 +593,7 @@ if [[ -n "${DOCKERAPP_ACTION}" ]]; then
 fi
 
 if [[ ! -f "$COMPOSE_FILE" ]]; then
-    echo -e "${C_RED}ERROR${C_REG}: Could not find ${IMAGE}:${VERSION} (${PROJECT}) - do you need to create it with \`nimbusapp up'" >&2
-    exit 1
+    fatal "Could not find ${IMAGE}:${VERSION} (${PROJECT}) - do you need to create it with \`nimbusapp up'"
 fi
 
 if [[ "$COMPOSE_ACTION" == "down" && "$NIMBUS_FORCE" -eq 0 ]]; then
@@ -521,7 +602,7 @@ if [[ "$COMPOSE_ACTION" == "down" && "$NIMBUS_FORCE" -eq 0 ]]; then
     fi
 fi
 
-if [[ "$COMPOSE_ACTION" == "up -d" && "$NIMBUS_FORCE" -eq 0 ]]; then
+if [[ "$COMPOSE_ACTION" == "up"* && "$NIMBUS_FORCE" -eq 0 && "$COMPOSE_ARGS" != *"--force-recreate"* ]]; then
     if ! check_recreate; then
         exit 1
     fi
@@ -540,11 +621,12 @@ if [[ -n "${COMPOSE_ACTION}" ]]; then
 
     debug "Running: ${COMPOSE_COMMAND}"
 
-    if ! eval "${COMPOSE_COMMAND}"; then
+    if ! eval "${COMPOSE_COMMAND} 2>&1 | tee -a '$NIMBUS_LOG_FILE'"; then
         rc=$?
-        echo "Failed to run compose: $rc" >&2
+        error "Failed to run compose: $rc"
         exit $rc
     fi
 fi
 
 apps_save
+log_prune

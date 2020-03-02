@@ -87,3 +87,17 @@ function assert_message() {
 
     assert_message "force"
 }
+
+@test "Recreate: --force-recreate" {
+    run "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=force-recreate" -d up --force-recreate
+
+    (( stauts == 0 ))
+
+    assert_not_output_contains "The following containers will be recreated:"
+    assert_not_output_contains "- /nimbusapp-test-web" 
+    assert_not_output_contains "Recreate the listed containers? \[y/n\]"
+
+    assert_output_contains "Recreating nimbusapp-test-web ... done"
+
+    assert_message "force-recreate"
+}

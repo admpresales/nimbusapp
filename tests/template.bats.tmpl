@@ -1,0 +1,26 @@
+#!/usr/bin/env bats
+
+load helper
+load docker_assert
+
+function setup() {
+    export NIMBUS_BASEDIR="$BATS_TMPDIR/nimbusapp-test-basic"
+
+    if is_first_test; then
+        mkdir -p "$NIMBUS_BASEDIR"
+        cleanup_containers "$TEST_CONTAINER"
+    else
+        export NIMBUS_DOCKERHUB_URL="0.0.0.0:0"
+    fi
+}
+
+function teardown() {
+    if is_last_test; then
+        cleanup_containers "$TEST_CONTAINER"
+        rm -fr "$NIMBUS_BASEDIR"
+    fi
+}
+
+@test "Template" {
+
+}

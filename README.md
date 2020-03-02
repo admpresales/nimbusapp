@@ -46,7 +46,89 @@ You may need to remove or rename extra copies of the script until the correct sc
 /usr/local/bin/nimbusapp
 ```
 
-## Running
+## Using Nimbusapp
 
-Please refer to the individual images on [ADM Presales Docker Hub](https://hub.docker.com/u/admpresales)
-for instructions and sample commands for running nimbusapp.
+This section provides basic usage instructions.
+Please refer to the individual dockerapp entries on [ADM Presales Docker Hub](https://hub.docker.com/u/admpresales)
+for image specific instructions.
+
+Examples use the [Nimbusapp Test Image](./tests/nimbusapp-test.dockerapp), which starts a single container with a lightweight web server.
+
+See the [Usage Text](./USAGE.txt) or `nimbusapp help` for more information.
+
+Please refer to the individual images on [ADM Presales Docker Hub](https://hub.docker.com/u/admpresales) for image-specific instructions and examples.
+
+### Gerneral Format
+
+Where possible commands mirror the `docker-compose` features which are used under the covers.
+
+```
+nimbusapp <image> <command>
+```
+
+### Create Containeres
+
+Using the `up` command will pull images, create containers and start the containers all in one operation.
+
+Version numbers are only required the first time an image is pulled, and will be remembered for future commands.
+
+```
+[demo@nimbusserver nimbusapp]$ nimbusapp nimbusapp-test:0.1.0 up
+Authenticating with existing credentials...
+Login Succeeded
+Creating nimbusapp-test-web ... done
+```
+
+To create containers from an image without starting the containers immediately, use the `--no-start` option:
+
+```
+[demo@nimbusserver nimbusapp]$ nimbusapp nimbusapp-test:0.1.0 up --no-start
+```
+
+### Check Container Status
+
+To verify the state of a container, use the `ps` command.
+
+```
+[demo@nimbusserver nimbusapp]$ nimbusapp nimbusapp-test ps
+       Name              Command        State           Ports
+---------------------------------------------------------------------
+nimbusapp-test-web   httpd-foreground   Up      0.0.0.0:12345->80/tcp
+
+```
+
+### Starting Containers
+
+To start existing containers, use the `start` command.
+
+```
+[demo@nimbusserver nimbusapp]$ nimbusapp nimbusapp-test start
+Starting web ... done
+```
+
+
+### Stopping Containers
+
+To stop running containers, use the `stop` command.
+
+```
+[demo@nimbusserver nimbusapp]$ nimbusapp nimbusapp-test stop
+Stopping nimbusapp-test-web ... done
+```
+
+### Delete Containers
+
+```
+[demo@nimbusserver nimbusapp]$ nimbusapp nimbusapp-test down
+
+This action will DELETE your containers and is IRREVERSIBLE!
+
+You may wish to use `nimbusapp ... stop' to shut down your containers without deleting them
+
+The following containers will be deleted:
+- /nimbusapp-test-web
+
+Do you wish to DELETE these containers? [y/n] y
+Stopping nimbusapp-test-web ... done
+Removing nimbusapp-test-web ... done
+```
