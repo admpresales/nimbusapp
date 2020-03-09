@@ -33,6 +33,10 @@ EOF
     # Cannot use $TEST_IMAGE here
     run "$NIMBUS_EXE" nimbusapp-test -d -f up
     (( status == 0 ))
+
+    # Ensure nothing gets deleted
+    grep "nimbusapp-test\s" "$NIMBUS_BASEDIR/apps.config"
+    grep "nimbusapp-test-fake\s" "$NIMBUS_BASEDIR/apps.config"
 }
 
 @test "Config: Remember" {

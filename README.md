@@ -5,10 +5,19 @@ This script is based on the images in https://hub.docker.com/u/admpresales
 
 ## Installation
 
+### Quick Install
+
+```
+wget -nv https://github.com/admpresales/nimbusapp/releases/latest/download/nimbusapp.tar.gz -O- | sudo tar -xz -C /usr/local/bin
+```
+
+### Manual Install
+
 Download the latest .tar.gz release from https://github.com/admpresales/nimbusapp/releases by executing the following commands from a terminal window:
 
 ```
 [demo@nimbusserver ~]$ cd ~/Downloads
+[demo@nimbusserver ~]$ rm -f nimbusapp.tar.gz*
 [demo@nimbusserver Downloads]$ wget -nv https://github.com/admpresales/nimbusapp/releases/latest/download/nimbusapp.tar.gz
 
 ```
