@@ -102,7 +102,7 @@ pipeline {
             steps {
                 lock('nimbusapp-test') {
                     sh '''
-                        export PATH="$PWD/bats-core/libexec/bats-core:$PATH"
+                        export PATH="$PWD/bats-core/bin:$PWD/bats-core/libexec/bats-core:$PATH"
                         bats tests --tap | tee bats-tap.log
                     '''
                 }
