@@ -526,12 +526,6 @@ COMPOSE_FILE="${COMPOSE_DIR}/${IMAGE}.yml"
 COMPOSE_BACKUP="${COMPOSE_FILE}.bk"
 
 if [[ -n "${DOCKERAPP_ACTION}" ]]; then
-    if ! docker login >&2; then
-        rc=$?
-        error "Docker login failed ($rc)"
-        exit $rc
-    fi
-
     if curl -s --connect-timeout "${NIMBUS_DOCKERHUB_TIMEOUT}" "${NIMBUS_DOCKERHUB_URL}" > /dev/null 2>&1; then
         DOCKERAPP_COMMAND="${DOCKERAPP_COMMAND} ${DOCKERAPP_ACTION} ${DOCKERAPP_ARGS} ${REPOSITORY}/${IMAGE}:${VERSION}"
 
