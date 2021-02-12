@@ -32,6 +32,7 @@ Commands:
   stop     Stop existing containers
   up       Creates and start containers
   version  Prints version information  
+  update   Update the version of nimbusapp to the latest version
   
 Experimental/Advanced Options:  
   -v    Mounts volume for IdeaProject in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS
@@ -55,6 +56,20 @@ USAGE_EOF
 function version_info() {
     output "nimbusapp version $NIMBUS_RELEASE_VERSION"
     output "Released on $NIMBUS_RELEASE_DATE"
+}
+
+function update_version() {
+    version_info
+
+    if prompt_yn "${C_BOLD}${C_RED}Do you want to update your nimbusapp version?${C_RESET}"; then
+        output "Updating nimbusapp version..."
+
+        if wget -nv -q "$NIMBUS_DOWNLOAD_URL" -O- | sudo tar -xzv -C "$NIMBUS_INSTALL_DIR" >/dev/null 2>&1; then
+            "${NIMBUS_INSTALL_DIR}/nimbusapp" --version
+        else
+            error "Updating nimbusapp version - version unchanged"
+        fi
+    fi
 }
 
 # Ensure the apps.config file is initialized
@@ -347,6 +362,9 @@ NIMBUS_DEBUG="${NIMBUS_DEBUG-0}"
 NIMBUS_OUTPUT="${NIMBUS_OUTPUT-1}"
 NIMBUS_FORCE="${NIMBUS_FORCE-0}"
 
+NIMBUS_DOWNLOAD_URL="${NIMBUS_DOWNLOAD_URL-https://github.com/admpresales/nimbusapp/releases/latest/download/nimbusapp.tar.gz}"
+NIMBUS_INSTALL_DIR="${NIMBUS_INSTALL_DIR-/usr/local/bin}"
+
 NETWORK_NAME="${NETWORK_NAME-demo-net}"
 NETWORK_SUBNET="${NETWORK_SUBNET-172.50.0.0/16}"
 NETWORK_GATEWAY="${NETWORK_GATEWAY-172.50.0.1}"
@@ -372,6 +390,11 @@ if [[ "$1" != "-"* ]]; then
         version_info
         exit 0
     fi
+
+    if [[ "${IMAGE}" = *"update"* ]]; then
+        update_version
+        exit 0
+    fi
 fi
 
 while [[ "$1" != "" ]]; do
@@ -381,6 +404,10 @@ while [[ "$1" != "" ]]; do
     case "$PARAM" in
     -h | --help | help)
         usage
+        ;;
+    --update)
+        update_version
+        exit 0
         ;;
     --version)
         version_info
