@@ -4,12 +4,6 @@ load helper
 load output_assert
 load docker_assert
 
-function setup() {
-}
-
-function teardown() {
-}
-
 @test "Tags: Fetch All Tags" {
     run "$NIMBUS_EXE" nimbusapp-test tags
 
