@@ -11,18 +11,16 @@ function teardown() {
 }
 
 @test "Tags: Fetch All Tags" {
-    results="$(\"${NIMBUS_EXE}\"nimbusapp-test tags )"
+    run "$NIMBUS_EXE" nimbusapp-test tags
 
-    if [[ $results != "0.2.0/n0.1.0"]]; then
-      exit 1
-    fi
+    assert_output_contains "0.2.0"
+    assert_output_contains "0.1.0"
 }
 
-@test "Config: Remember" {
-    results = "$(\"${NIMBUS_EXE}\"nimbusapp-test --latest tags )"
+@test "Tags: Fetch Latest Tag" {
+    run "$NIMBUS_EXE" nimbusapp-test --latest tags
 
-    if [[ $results != "0.1.0"]]; then
-      exit 1
-    fi
+    assert_output_contains "0.2.0"
+    assert_not_output_contains "0.1.0"
 }
 
