@@ -77,7 +77,7 @@ function update_version() {
 function get_tags() {
   IMAGE="${IMAGE%.dockerapp}"
   NUM_RESULTS=""
-  if [[ ${LATEST_FLAG} == true ]]; then
+  if [[ $LATEST_FLAG -eq 1 ]]; then
     NUM_RESULTS=1
   fi
   #This string will get all non-dev versions from docker hub, in last updated order.
@@ -391,7 +391,7 @@ ENV_FILE="${NIMBUS_BASEDIR}/apps.config"
 NIMBUS_LOG_FILE="${NIMBUS_LOG_FILE-${NIMBUS_BASEDIR}/nimbusapp.log}"
 NIMBUS_LOG_LINES=10000
 
-LATEST_FLAG=false
+LATEST_FLAG=0
 
 log "CMD" "$0 $*"
 
@@ -442,7 +442,7 @@ while [[ "$1" != "" ]]; do
         shift 2
         ;;
     --latest)
-        LATEST_FLAG=true;
+        LATEST_FLAG=1;
         shift
         ;;
     # TODO: Intellij checks should happen after image parsing
