@@ -9,6 +9,7 @@ load docker_assert
 
     assert_output_contains "0.2.0"
     assert_output_contains "0.1.0"
+    assert_not_output_contains "0.2.0-dev"
 }
 
 @test "Tags: Fetch Latest Tag" {
@@ -16,5 +17,6 @@ load docker_assert
 
     assert_output_contains "0.2.0"
     assert_not_output_contains "0.1.0"
+    assert_not_output_contains "0.2.0-dev"
 }
 
