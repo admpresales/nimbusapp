@@ -16,6 +16,7 @@ Options:
   -d, --debug Enable debugging output (use twice for verbose bash commands)
   -f, --force Skip all prompts - Use with caution, this option will happily delete your data without warning
   -s, --set   Enables you to set(override) default arguments
+  --latest    (Supported only with tags command) Runs command against latest version in repository.
   --version   Print the version of nimbusapp and exit
 
 Commands:
@@ -31,6 +32,7 @@ Commands:
   start    Start existing containers
   stop     Stop existing containers
   up       Creates and start containers
+  tags     List all available tags from the repository for a given application
   version  Prints version information
   update   Update the version of nimbusapp to the latest version
   
