@@ -66,7 +66,7 @@ function update_version() {
     if prompt_yn "${C_BOLD}${C_RED}Do you want to update your nimbusapp version?${C_RESET}"; then
         output "Updating nimbusapp version..."
 
-        if wget -nv -q "$NIMBUS_DOWNLOAD_URL" -O- | sudo tar -xzv -C "$NIMBUS_INSTALL_DIR" >/dev/null 2>&1; then
+        if curl "$NIMBUS_DOWNLOAD_URL" | sudo tar -xzv -C "$NIMBUS_INSTALL_DIR" >/dev/null; then
             "${NIMBUS_INSTALL_DIR}/nimbusapp" --version
         else
             error "Updating nimbusapp version - version unchanged"
@@ -176,6 +176,10 @@ function create_intellij_mount_points (){
 function prompt_yn() {
     local PROMPT_TEXT=$"${1-Continue?} [y/n]"
     local USER_ANSWER
+
+    if (( NIMBUS_FORCE > 0 )); then
+        return 0
+    fi
 
     echo -ne "${PROMPT_TEXT} " >&2
 
@@ -422,7 +426,7 @@ while [[ "$1" != "" ]]; do
     -h | --help | help)
         usage
         ;;
-    --update)
+    --update|update)
         update_version
         exit 0
         ;;
