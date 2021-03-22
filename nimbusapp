@@ -16,6 +16,7 @@ Options:
   -d, --debug Enable debugging output (use twice for verbose bash commands)
   -f, --force Skip all prompts - Use with caution, this option will happily delete your data without warning
   -s, --set   Enables you to set(override) default arguments
+  --latest    (Supported only with tags command) Runs command against latest version in repository.
   --version   Print the version of nimbusapp and exit
 
 Commands:
@@ -31,7 +32,8 @@ Commands:
   start    Start existing containers
   stop     Stop existing containers
   up       Creates and start containers
-  version  Prints version information  
+  tags     List all available tags from the repository for a given application
+  version  Prints version information
   update   Update the version of nimbusapp to the latest version
   
 Experimental/Advanced Options:  
@@ -70,6 +72,18 @@ function update_version() {
             error "Updating nimbusapp version - version unchanged"
         fi
     fi
+}
+
+function get_tags() {
+  IMAGE="${IMAGE%.dockerapp}"
+  NUM_RESULTS=""
+  if [[ $LATEST_FLAG -eq 1 ]]; then
+    NUM_RESULTS=1
+  fi
+  #This string will get all non-dev versions from docker hub, in last updated order.
+  results="$(curl -s -o -w %{http_code} https://hub.docker.com/v2/repositories/admpresales/${IMAGE}.dockerapp/tags?ordering=last_updated | jq .results[].name | grep -v dev | head -n $NUM_RESULTS)"
+
+  printf '%s\n' $results
 }
 
 # Ensure the apps.config file is initialized
@@ -252,6 +266,7 @@ check_recreate() {
     return 0
 }
 
+
 # -s var=val
 # docker-app parses the "val" portion as a YAML value, which will cause it to infer a type
 # unquoted numbers cause issues when they are rendered with the inferred type (5.00 becomes 5)
@@ -376,6 +391,8 @@ ENV_FILE="${NIMBUS_BASEDIR}/apps.config"
 NIMBUS_LOG_FILE="${NIMBUS_LOG_FILE-${NIMBUS_BASEDIR}/nimbusapp.log}"
 NIMBUS_LOG_LINES=10000
 
+LATEST_FLAG=0
+
 log "CMD" "$0 $*"
 
 if [[ "$1" != "-"* ]]; then
@@ -423,6 +440,10 @@ while [[ "$1" != "" ]]; do
     -s | --set)
         append_dockerapp_arg "$PARAM" "$VALUE"
         shift 2
+        ;;
+    --latest)
+        LATEST_FLAG=1;
+        shift
         ;;
     # TODO: Intellij checks should happen after image parsing
     -v)
@@ -477,6 +498,10 @@ while [[ "$1" != "" ]]; do
         COMPOSE_ACTION="pull"
         shift
         break
+        ;;
+    tags)
+        get_tags
+        exit 0
         ;;
     up)
         DOCKERAPP_ACTION="render"
