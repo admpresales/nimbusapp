@@ -75,7 +75,7 @@ Where possible commands mirror the `docker-compose` features which are used unde
 nimbusapp <image> <command>
 ```
 
-### Create Containeres
+### Create Containers
 
 Using the `up` command will pull images, create containers and start the containers all in one operation.
 

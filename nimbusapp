@@ -16,6 +16,7 @@ Options:
   -d, --debug Enable debugging output (use twice for verbose bash commands)
   -f, --force Skip all prompts - Use with caution, this option will happily delete your data without warning
   -s, --set   Enables you to set(override) default arguments
+  --latest    (Supported only with tags command) Runs command against latest version in repository.
   --version   Print the version of nimbusapp and exit
 
 Commands:
@@ -31,7 +32,9 @@ Commands:
   start    Start existing containers
   stop     Stop existing containers
   up       Creates and start containers
-  version  Prints version information  
+  tags     List all available tags from the repository for a given application
+  version  Prints version information
+  update   Update the version of nimbusapp to the latest version
   
 Experimental/Advanced Options:  
   -v    Mounts volume for IdeaProject in IntelliJ container into user's home directory - EXPERIMENTAL: ONLY USE IF YOU UNDERSTAND VOLUME MOUNTS
@@ -55,6 +58,39 @@ USAGE_EOF
 function version_info() {
     output "nimbusapp version $NIMBUS_RELEASE_VERSION"
     output "Released on $NIMBUS_RELEASE_DATE"
+}
+
+function update_version() {
+    "${NIMBUS_INSTALL_DIR}/nimbusapp" version
+
+    if prompt_yn "${C_BOLD}${C_RED}Do you want to update your nimbusapp version?${C_RESET}"; then
+        output "Updating ${NIMBUS_INSTALL_DIR}/nimbusapp ..."
+
+        local SUDO='sudo'
+        if [[ -w "$NIMBUS_INSTALL_DIR" ]]; then # Sudo not required (usually in $HOME or CI server)
+            SUDO=''
+        fi
+
+	    debug "Using sudo command: '$SUDO'"
+
+        if curl -L -s --fail "$NIMBUS_DOWNLOAD_URL" | $SUDO tar -xzv -C "$NIMBUS_INSTALL_DIR" >/dev/null; then
+            "${NIMBUS_INSTALL_DIR}/nimbusapp" version
+        else
+            fatal "Nimbusapp update failed."
+        fi
+    fi
+}
+
+function get_tags() {
+  IMAGE="${IMAGE%.dockerapp}"
+  tag_filter_command='cat'
+  if [[ $LATEST_FLAG -eq 1 ]]; then
+    tag_filter_command='head -n 1'
+  fi
+  #This string will get all non-dev versions from docker hub, in last updated order.
+  results="$(curl -s -o -w %{http_code} https://hub.docker.com/v2/repositories/admpresales/${IMAGE}.dockerapp/tags?ordering=last_updated | jq -r .results[].name | grep -v dev | ${tag_filter_command})"
+
+  printf '%s\n' $results
 }
 
 # Ensure the apps.config file is initialized
@@ -148,6 +184,10 @@ function prompt_yn() {
     local PROMPT_TEXT=$"${1-Continue?} [y/n]"
     local USER_ANSWER
 
+    if (( NIMBUS_FORCE > 0 )); then
+        return 0
+    fi
+
     echo -ne "${PROMPT_TEXT} " >&2
 
     while read USER_ANSWER; do
@@ -236,6 +276,7 @@ check_recreate() {
 
     return 0
 }
+
 
 # -s var=val
 # docker-app parses the "val" portion as a YAML value, which will cause it to infer a type
@@ -347,6 +388,9 @@ NIMBUS_DEBUG="${NIMBUS_DEBUG-0}"
 NIMBUS_OUTPUT="${NIMBUS_OUTPUT-1}"
 NIMBUS_FORCE="${NIMBUS_FORCE-0}"
 
+NIMBUS_DOWNLOAD_URL="${NIMBUS_DOWNLOAD_URL-https://github.com/admpresales/nimbusapp/releases/latest/download/nimbusapp.tar.gz}"
+NIMBUS_INSTALL_DIR="${NIMBUS_INSTALL_DIR-/usr/local/bin}"
+
 NETWORK_NAME="${NETWORK_NAME-demo-net}"
 NETWORK_SUBNET="${NETWORK_SUBNET-172.50.0.0/16}"
 NETWORK_GATEWAY="${NETWORK_GATEWAY-172.50.0.1}"
@@ -357,6 +401,8 @@ ENV_FILE="${NIMBUS_BASEDIR}/apps.config"
 
 NIMBUS_LOG_FILE="${NIMBUS_LOG_FILE-${NIMBUS_BASEDIR}/nimbusapp.log}"
 NIMBUS_LOG_LINES=10000
+
+LATEST_FLAG=0
 
 log "CMD" "$0 $*"
 
@@ -372,6 +418,11 @@ if [[ "$1" != "-"* ]]; then
         version_info
         exit 0
     fi
+
+    if [[ "${IMAGE}" = *"update"* ]]; then
+        update_version
+        exit 0
+    fi
 fi
 
 while [[ "$1" != "" ]]; do
@@ -381,6 +432,10 @@ while [[ "$1" != "" ]]; do
     case "$PARAM" in
     -h | --help | help)
         usage
+        ;;
+    --update|update)
+        update_version
+        exit 0
         ;;
     --version)
         version_info
@@ -396,6 +451,10 @@ while [[ "$1" != "" ]]; do
     -s | --set)
         append_dockerapp_arg "$PARAM" "$VALUE"
         shift 2
+        ;;
+    --latest)
+        LATEST_FLAG=1;
+        shift
         ;;
     # TODO: Intellij checks should happen after image parsing
     -v)
@@ -450,6 +509,10 @@ while [[ "$1" != "" ]]; do
         COMPOSE_ACTION="pull"
         shift
         break
+        ;;
+    tags)
+        get_tags
+        exit 0
         ;;
     up)
         DOCKERAPP_ACTION="render"
