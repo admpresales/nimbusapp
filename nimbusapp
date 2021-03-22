@@ -61,22 +61,22 @@ function version_info() {
 }
 
 function update_version() {
-    version_info
+    "${NIMBUS_INSTALL_DIR}/nimbusapp" version
 
     if prompt_yn "${C_BOLD}${C_RED}Do you want to update your nimbusapp version?${C_RESET}"; then
-        output "Updating nimbusapp version..."
+        output "Updating ${NIMBUS_INSTALL_DIR}/nimbusapp ..."
 
         local SUDO='sudo'
-        if [[ -w "$NIMBUS_INSTALL_DIR" ]]; then
+        if [[ -w "$NIMBUS_INSTALL_DIR" ]]; then # Sudo not required (usually in $HOME or CI server)
             SUDO=''
         fi
 
-	debug "Using sudo command: $SUDO"
+	    debug "Using sudo command: '$SUDO'"
 
-        if curl -s "$NIMBUS_DOWNLOAD_URL" | $SUDO tar -xzv -C "$NIMBUS_INSTALL_DIR" >/dev/null; then
-            "${NIMBUS_INSTALL_DIR}/nimbusapp" --version
+        if curl -L -s --fail "$NIMBUS_DOWNLOAD_URL" | $SUDO tar -xzv -C "$NIMBUS_INSTALL_DIR" >/dev/null; then
+            "${NIMBUS_INSTALL_DIR}/nimbusapp" version
         else
-            error "Updating nimbusapp version - version unchanged"
+            fatal "Nimbusapp update failed."
         fi
     fi
 }
