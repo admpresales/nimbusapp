@@ -76,12 +76,12 @@ function update_version() {
 
 function get_tags() {
   IMAGE="${IMAGE%.dockerapp}"
-  NUM_RESULTS=""
+  tag_filter_command='cat'
   if [[ $LATEST_FLAG -eq 1 ]]; then
-    NUM_RESULTS=1
+    tag_filter_command='head -n 1'
   fi
   #This string will get all non-dev versions from docker hub, in last updated order.
-  results="$(curl -s -o -w %{http_code} https://hub.docker.com/v2/repositories/admpresales/${IMAGE}.dockerapp/tags?ordering=last_updated | jq .results[].name | grep -v dev | head -n $NUM_RESULTS)"
+  results="$(curl -s -o -w %{http_code} https://hub.docker.com/v2/repositories/admpresales/${IMAGE}.dockerapp/tags?ordering=last_updated | jq -r .results[].name | grep -v dev | ${tag_filter_command})"
 
   printf '%s\n' $results
 }
