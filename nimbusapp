@@ -71,6 +71,8 @@ function update_version() {
             SUDO=''
         fi
 
+	debug "Using sudo command: $SUDO"
+
         if curl -s "$NIMBUS_DOWNLOAD_URL" | $SUDO tar -xzv -C "$NIMBUS_INSTALL_DIR" >/dev/null; then
             "${NIMBUS_INSTALL_DIR}/nimbusapp" --version
         else

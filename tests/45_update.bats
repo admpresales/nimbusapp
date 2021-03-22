@@ -14,6 +14,7 @@ load output_assert
     rm -f "$DST/nimbusapp" "$SRC/nimbusapp" "$SRC/nimbusapp.tar.gz"
 
     cp nimbusapp "$SRC"
+    cp nimbusapp "$DST"
     
     pushd "$SRC"
 
@@ -30,9 +31,7 @@ load output_assert
     export NIMBUS_INSTALL_DIR="$DST"
     export NIMBUS_DOWNLOAD_URL="file://$SRC/nimbusapp.tar.gz"
 
-    [[ ! -f "$DST/nimbusapp" ]]
-
-    "./nimbusapp" -f update
+    "$DST/nimbusapp" -f update
 
     [[ -f "$DST/nimbusapp" ]]
 
