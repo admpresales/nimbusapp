@@ -66,7 +66,12 @@ function update_version() {
     if prompt_yn "${C_BOLD}${C_RED}Do you want to update your nimbusapp version?${C_RESET}"; then
         output "Updating nimbusapp version..."
 
-        if curl "$NIMBUS_DOWNLOAD_URL" | sudo tar -xzv -C "$NIMBUS_INSTALL_DIR" >/dev/null; then
+        local SUDO='sudo'
+        if [[ -w "$NIMBUS_INSTALL_DIR" ]]; then
+            SUDO=''
+        fi
+
+        if curl -s "$NIMBUS_DOWNLOAD_URL" | $SUDO tar -xzv -C "$NIMBUS_INSTALL_DIR" >/dev/null; then
             "${NIMBUS_INSTALL_DIR}/nimbusapp" --version
         else
             error "Updating nimbusapp version - version unchanged"
