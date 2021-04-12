@@ -20,3 +20,8 @@ load docker_assert
     assert_not_output_contains "0.2.0-dev"
 }
 
+@test "Tags: Ouput Order" {
+    run "$NIMBUS_EXE" nimbusapp-test tags
+
+    [[ "$output" == "0.2.0\n0.1.0" ]]
+}

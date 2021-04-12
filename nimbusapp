@@ -88,7 +88,7 @@ function get_tags() {
     tag_filter_command='head -n 1'
   fi
   #This string will get all non-dev versions from docker hub, in last updated order.
-  results="$(curl -s -o -w %{http_code} https://hub.docker.com/v2/repositories/admpresales/${IMAGE}.dockerapp/tags?ordering=last_updated | jq -r .results[].name | grep -v dev | ${tag_filter_command})"
+  results="$(curl -s https://hub.docker.com/v2/repositories/admpresales/${IMAGE}.dockerapp/tags | jq -r .results[].name | grep -v dev | sort -rV | ${tag_filter_command})"
 
   printf '%s\n' $results
 }
