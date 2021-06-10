@@ -33,6 +33,40 @@ function teardown() {
     rm -fvr "$NIMBUS_BASEDIR"
 }
 
+@test "Cache Command: File does not exist" {
+
+    run "$NIMBUS_EXE" does-not-exist cache
+
+    (( status == 1 ))
+
+    grep "No cached version exists for does-not-exist" <<< "$output"
+}
+
+@test "Cache Command: File exists" {
+
+    # Use a regular command to generate the cached file
+    [[ ! -f "$CACHE_FILE" ]]
+
+    "$NIMBUS_EXE" "$TEST_IMAGE" -d -d render
+
+    [[ -f "$CACHE_FILE" ]]
+
+    (( status == 1 ))
+
+    run "$NIMBUS_EXE" "$TEST_IMAGE" cache
+
+    grep "0.1.0"  <<< "$output"
+}
+
+@test "Cache: File does not exist" {
+
+    run "$NIMBUS_EXE" does-not-exist:1.0 start
+
+    (( status == 1 ))
+
+    grep "Could not find does-not-exist:1.0" <<< "$output"
+}
+
 @test "Cache: Use file offline" {
     # Use a regular command to generate the cached file
     [[ ! -f "$CACHE_FILE" ]]
@@ -50,15 +84,6 @@ function teardown() {
     assert_container_running "$TEST_CONTAINER"
 
     # Output should contain the following messages
-    grep "No connection to Docker Hub, using cached file!" <<< $output
-    grep "Docker Hub: 0.0.0.0:0 Timeout: 10" <<< $output
-}
-
-@test "Cache: No file" {
-
-    run "$NIMBUS_EXE" does-not-exist:1.0 start
-
-    (( status == 1 ))
-
-    grep "Could not find does-not-exist:1.0" <<< $output
+    grep "No connection to Docker Hub, using cached file!" <<< "$output"
+    grep "Docker Hub: 0.0.0.0:0 Timeout: 10" <<< "$output"
 }

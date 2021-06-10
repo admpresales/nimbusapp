@@ -20,6 +20,7 @@ Options:
   --version   Print the version of nimbusapp and exit
 
 Commands:
+  cache    Shows current cached version
   down     Stop and remove containers
   help     Prints this help message
   inspect  Shows metadata and settings for a given application
@@ -514,6 +515,9 @@ while [[ "$1" != "" ]]; do
         get_tags
         exit 0
         ;;
+    cache)
+        break
+        ;;
     up)
         DOCKERAPP_ACTION="render"
         
@@ -554,6 +558,15 @@ if [[ -n $PROJECT ]]; then
     apps_load "${PROJECT}"
 fi
 
+#This checks for cache contents after load has occured
+if [[ "$PARAM" == "cache" ]]; then
+  if [[ -z $VERSION ]]; then
+    fatal "No cached version exists for ${IMAGE}"
+  fi
+  echo "${VERSION}"
+  exit 0
+fi
+
 if [[ -z $VERSION ]]; then
     fatal "No version number specified!" \
         "" \
@@ -562,6 +575,7 @@ if [[ -z $VERSION ]]; then
         "" \
         "The version number you choose will be remembered for future commands."
 fi
+
 
 # Apply defaults if necessary
 REPOSITORY="${REPOSITORY-$DEFAULT_REPOSITORY}"
