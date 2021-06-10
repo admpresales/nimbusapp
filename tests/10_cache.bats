@@ -51,7 +51,7 @@ function teardown() {
 
     [[ -f "$CACHE_FILE" ]]
 
-    (( status == 1 ))
+    (( status == 0 ))
 
     run "$NIMBUS_EXE" "$TEST_IMAGE" cache
 
