@@ -13,6 +13,9 @@ use JSON qw();
 use YAML::XS qw();
 use Template;
 
+use LWP::UserAgent;
+use Sort::Versions;
+
 use Time::Piece;
 use Data::Dump;
 
@@ -25,9 +28,21 @@ use feature 'postderef';
 no warnings 'experimental::signatures';
 use feature 'signatures';
 
+sub json {
+    state $json = JSON::XS->new->utf8->pretty;
+    return $json;
+}
+
+sub ua {
+    state $ua = LWP::UserAgent->new(timeout => 10);
+    return $ua;
+}
+
 use constant {
     RELEASE_VERSION => "CHANGEME_RELEASE",
     RELEASE_DATE    => "CHANGEME_DATE",
+    COMPOSE_FILE    => 'docker-compose.yml',
+    DEFAULT_TAG_COUNT => 10
 };
 
 my %config = do {
@@ -48,7 +63,8 @@ my %config = do {
         DAEMON_CONFIG => $isWin32 ? 'C:\ProgramData\Docker\config\daemon.json' : '/etc/docker/daemon.json',
         LOG_FILE => $ENV{NIMBUS_LOG} // catfile($homeDir, 'nimbusapp.log'),
         INSTALL => $ENV{NIMBUS_INSTALL_DIR} // dirname($0),
-        DOWNLOAD => $ENV{NIMBUS_DOWNLOAD_URL} // 'https://github.com/admpresales/nimbusapp/releases/latest/nimbusapp' . $isWin32 ? '.zip' : '.tar.gz';
+        DOWNLOAD => $ENV{NIMBUS_DOWNLOAD_URL} // 'https://github.com/admpresales/nimbusapp/releases/latest/nimbusapp' . $isWin32 ? '.zip' : '.tar.gz',
+        HUB_API_BASE => $ENV{NIMBUS_HUB_API_BASE} // "https://hub.docker.com/v2",
         NL => "\n"
     );
 };
@@ -65,7 +81,8 @@ my %command = (
     up => prompt_first('CONFIRM_RECREATE', \&docker_app_compose),
     down => prompt_first('CONFIRM_DELETE', \&docker_compose),
     render => \&docker_app,
-    inspect => \&docker_app
+    inspect => \&docker_app,
+    tags => \&list_tags
 );
 
 $command{$_} = \&docker_compose for qw( pull start stop restart rm ps logs exec );
@@ -203,6 +220,24 @@ sub docker_app_compose {
     return docker_compose(@_);
 }
 
+sub list_tags($, $params, $) {
+    my $url = sprintf("%s/repositories/%s/%s.dockerapp/tags", $config{HUB_API_BASE}, $params->{org}, $params->{originalImage});
+    my $n = $params->{latest} // $params->{number} // DEFAULT_TAG_COUNT;
+
+    my $res = ua->get($url);
+
+    die "Error retrieving versions from Docker Hub: " . $res->status_line . $config{NL}
+        unless $res->is_success;
+
+    my $data = json->decode($res->content)->{results};
+
+    print "$_", $config{NL} for
+        grep { $n-- > 0 }
+        sort { versioncmp($b, $a) }
+        map { $_->{name} }
+        grep { $_->{name} !~ /-dev$/ } @$data;
+}
+
 sub load_app(%params) {
     my $json = JSON::XS->new->utf8->pretty;
 
@@ -214,8 +249,6 @@ sub load_app(%params) {
             $params{$_} ||= $app->{$_} for qw(tag org);
         }
     }
-
-    fatal text_block('VERSION_MISSING', \%params) if not defined $params{tag};
 
     return %params;
 }
@@ -296,7 +329,9 @@ my %re = (
     debug => build_re(qw(-d --debug)),
     force => build_re(qw(-f --force)),
     quiet => build_re(qw(-q --quiet)),
-    unsupported => build_re(qw(-v -m -p -f --force --preserve-volumes))
+    unsupported => build_re(qw(-v -m -p --preserve-volumes)),
+    number => build_re(qw(-n --number)),
+    latest => build_re(qw(--latest))
 );
 
 usage unless @ARGV;
@@ -334,22 +369,29 @@ while (@ARGV > 0) {
     elsif ($arg =~ $re{unsupported}) {
         fatal 'This version of nimbusapp does not support ', $arg;
     }
+    elsif ($arg =~ $re{latest}) {
+        $params{latest} = 1;
+    }
+    elsif ($arg =~ $re{number}) {
+        $params{number} = shift;
+    }
     elsif (defined $command{$arg}) {
         %params = load_app(%params);
 
-        for (qw(tag image)) {
-            fatal 'Required parameter missing: ', $_ if not defined $params{$_};
-        }
+        usage(1) if not defined $params{image};
 
         $params{org} //= $config{DEFAULT_ORG};
-        $params{fullImage} = sprintf "%s/%s.dockerapp:%s", @params{qw(org image tag)};
         $params{composeDir} = catfile($config{CACHE}, $params{image});
         $params{composeFile} = catfile($params{composeDir}, COMPOSE_FILE);
         $params{cmd} = $arg;
         $params{originalImage} = $params{image};
         $params{args} = [ @ARGV ];
 
-        info 'Using: ', $params{fullImage};
+        if ($arg ne 'tags') {
+            fatal text_block('MISSING_VERSION', \%params) if $arg ne 'tags' and not defined $params{tag};
+            $params{fullImage} = sprintf "%s/%s.dockerapp:%s", @params{qw(org image tag)};
+            info 'Using: ', $params{fullImage};
+        }
 
         my $rc = $command{$arg}->($arg, \%params, \@ARGV);
         save_app(%params) if $rc == 0;
