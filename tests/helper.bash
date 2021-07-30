@@ -7,7 +7,7 @@
 readonly TEST_IMAGE="${TEST_IMAGE-admpresales/nimbusapp-test:0.1.0}"
 readonly TEST_CONTAINER="${TEST_CONTAINER-nimbusapp-test-web}"
 
-export NIMBUS_EXE="$PWD/nimbusapp"
+export ${NIMBUS_EXE="$PWD/nimbusapp"}
 
 # cleanup_containers()
 #
