@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 
-use 5.032;
+use 5.020;
 use strict;
 use warnings;
 
@@ -18,6 +18,9 @@ use Data::Dump;
 
 use if $^O eq 'MSWin32', 'Win32::Console::ANSI';
 use Term::ANSIColor;
+
+no if $] < 5.024, qw( warnings experimental::postderef );
+use feature 'postderef';
 
 no warnings 'experimental::signatures';
 use feature 'signatures';
