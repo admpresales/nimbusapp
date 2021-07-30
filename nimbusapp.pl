@@ -188,7 +188,7 @@ sub docker_compose($cmd, $params, $args) {
         return $rc if $rc;
     }
 
-    push @$args, '-d' if $cmd eq 'up' && ! grep { $_ eq '--no-start' } @$args;
+    unshift @$args, '-d' if $cmd eq 'up' && ! grep { $_ eq '--no-start' } @$args;
 
     my @compose = ( 'docker-compose', '-f', $params->{composeFile}, '-p', $params->{image}, $cmd, @$args );
     debug("Running: ", join ' ', @compose);
