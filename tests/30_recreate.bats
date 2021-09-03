@@ -52,7 +52,7 @@ function assert_message() {
 
     (( status == 0 ))
 
-    assert_output_contains "The following containers will be recreated:"
+    assert_output_contains "The following containers may be recreated:"
     assert_output_contains "- /nimbusapp-test-web" 
     assert_output_contains "Recreate the listed containers? \[y/n\]"
     assert_output_contains "Recreating nimbusapp-test-web ... done"
@@ -65,7 +65,7 @@ function assert_message() {
 
     (( status == 1 ))
     
-    assert_output_contains "The following containers will be recreated:"
+    assert_output_contains "The following containers may be recreated:"
     assert_output_contains "- /nimbusapp-test-web" 
     assert_output_contains "Recreate the listed containers? \[y/n\]"
 
@@ -79,7 +79,7 @@ function assert_message() {
 
     (( stauts == 0 ))
 
-    assert_not_output_contains "The following containers will be recreated:"
+    assert_not_output_contains "The following containers may be recreated:"
     assert_not_output_contains "- /nimbusapp-test-web" 
     assert_not_output_contains "Recreate the listed containers? \[y/n\]"
 
@@ -93,7 +93,7 @@ function assert_message() {
 
     (( stauts == 0 ))
 
-    assert_not_output_contains "The following containers will be recreated:"
+    assert_not_output_contains "The following containers may be recreated:"
     assert_not_output_contains "- /nimbusapp-test-web" 
     assert_not_output_contains "Recreate the listed containers? \[y/n\]"
 
