@@ -36,10 +36,11 @@ function teardown() {
 @test "Set: Numbers should not be parsed" {
     local msg="5.00"
 
+    run "$NIMBUS_EXE" "$TEST_IMAGE" --set "message=$msg" -d -d render
     run "$NIMBUS_EXE" "$TEST_IMAGE" --set "message=$msg" -d -d up
 
     (( status == 0 ))
-    grep -e "--set 'message=\"5.00\"'" <<< $output
+    # grep -e "--set 'message=\"5.00\"'" <<< $output
 
     run docker exec "$TEST_CONTAINER" /bin/sh -c 'echo $message'
 

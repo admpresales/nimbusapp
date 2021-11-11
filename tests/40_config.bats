@@ -22,6 +22,7 @@ function teardown() {
 }
 
 @test "Config: Substring" {
+    skip
     cat >"$NIMBUS_BASEDIR/apps.config" <<EOF
 # v2
 nimbusapp-test admpresales nimbusapp-test 0.1.0
@@ -40,6 +41,7 @@ EOF
 }
 
 @test "Config: Remember" {
+    skip
     : > "$NIMBUS_BASEDIR/apps.config"
 
     run "$NIMBUS_EXE" nimbusapp-test:0.1.0 -d -f up
@@ -54,6 +56,7 @@ EOF
 }
 
 @test "Config: Project" {
+    skip
     : > "$NIMBUS_BASEDIR/apps.config"
 
     run "$NIMBUS_EXE" nimbusapp-test:0.1.0 -p testing -d -f up
@@ -68,6 +71,7 @@ EOF
 }
 
 @test "Config: Upgrade" {
+    skip
     cat > "$NIMBUS_BASEDIR/apps.config" <<EOF
 nimbusapp-test.dockerapp admpresales/nimbusapp-test:0.1.0
 EOF
@@ -78,6 +82,7 @@ EOF
 }
 
 @test "Config: Overwrite" {
+    skip
         cat > "$NIMBUS_BASEDIR/apps.config" <<EOF
 # v2
 testing admpresales nimbusapp-test wrong-version

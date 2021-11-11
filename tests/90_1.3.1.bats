@@ -6,7 +6,7 @@ load output_assert
 
 function setup() {
     export NIMBUS_BASEDIR="$BATS_TMPDIR/nimbusapp-test-131"
-
+    
     if is_first_test; then
         rm -rf "$NIMBUS_BASEDIR"
         mkdir -p "$NIMBUS_BASEDIR"
@@ -31,11 +31,11 @@ function teardown() {
     
     cat "$logFile"
 
-    grep "CMD - .* $TEST_IMAGE -s MESSAGE=$num -f up" "$logFile"
+    grep "CMD $TEST_IMAGE -s MESSAGE=$num -f up" "$logFile"
     
-    grep "DEBUG - -s MESSAGE=$num" "$logFile"
+    # grep "DEBUG - -s MESSAGE=$num" "$logFile"
 
-    grep "INFO - Using admpresales/nimbusapp-test.dockerapp:0.1.0" "$logFile"
+    grep "INFO Using: admpresales/nimbusapp-test.dockerapp:0.1.0" "$logFile"
 }
 
 @test "v1.3.1: No Version Message" {

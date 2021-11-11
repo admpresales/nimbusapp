@@ -4,20 +4,20 @@ use 5.020;
 use strict;
 use warnings;
 
+use File::Temp qw();
+use File::Copy qw(move);
 use File::Slurp qw(read_file write_file);
 use File::Spec::Functions qw(catfile);
 use File::Path qw(make_path);
 use File::Basename qw(basename dirname);
 
-use JSON qw();
-use YAML::XS qw();
-use Template;
-
-use LWP::UserAgent;
-use Sort::Versions;
+use JSON::Tiny qw(encode_json decode_json); # HTTP responses, docker + nimbus config
+use YAML::Tiny;     # Docker compose
+use HTTP::Tiny;     # Download update, tags
+use Template::Tiny; # Text content
 
 use Time::Piece;
-use Data::Dump;
+use Sort::Versions;
 
 use if $^O eq 'MSWin32', 'Win32::Console::ANSI';
 use Term::ANSIColor;
@@ -28,16 +28,6 @@ use feature 'postderef';
 no warnings 'experimental::signatures';
 use feature 'signatures';
 
-sub json {
-    state $json = JSON::XS->new->utf8->pretty;
-    return $json;
-}
-
-sub ua {
-    state $ua = LWP::UserAgent->new(timeout => 10);
-    return $ua;
-}
-
 use constant {
     RELEASE_VERSION => "CHANGEME_RELEASE",
     RELEASE_DATE    => "CHANGEME_DATE",
@@ -47,37 +37,46 @@ use constant {
 
 my %config = do {
     my $isWin32 = $^O eq 'MSWin32';
-    my $homeDir = $ENV{NIMBUS_HOME} //
-        catfile( ($ENV{HOME} // $ENV{USERPROFILE} // die "Could not determine home directory.\n"), ".nimbusapp" );
+    my $userHome = $ENV{HOME} // $ENV{USERPROFILE};
+    my $nimbusHome = $ENV{NIMBUS_HOME} // $ENV{NIMBUS_BASEDIR} //
+        catfile( 
+            $userHome // fatal("Could not determine home directory.\n"), 
+            ".nimbusapp" 
+        );
 
-    make_path($homeDir) unless -d $homeDir;
+    make_path($nimbusHome) unless -d $nimbusHome;
 
     (
         WINDOWS => $isWin32,
-        DEFAULT_ORG => "admpresales",
-        APPS_CONFIG => $ENV{NIMBUS_CONFIG} // catfile($homeDir, 'apps.json'),
-        CACHE => $ENV{NIMBUS_CACHE} // catfile($homeDir, 'cache'),
+        DEFAULT_ORG => $ENV{NIMBUS_DEFAULT_ORG} // "admpresales",
+        APPS_CONFIG => $ENV{NIMBUS_CONFIG} // catfile($nimbusHome, 'apps.json'),
+        APPS_OLD_CONFIG => $ENV{NIMBUS_OLD_CONFIG} // catfile($nimbusHome, 'apps.config'),
+        CACHE => $ENV{NIMBUS_CACHE} // catfile($nimbusHome, 'cache'),
         DEBUG => $ENV{NIMBUS_DEBUG} // 0,     # Be verbose
         FORCE => $ENV{NIMBUS_FORCE} // 0,     # Skip prompts
         QUIET => $ENV{NIMBUS_QUIET} // 0,     # Be quiet
         DAEMON_CONFIG => $isWin32 ? 'C:\ProgramData\Docker\config\daemon.json' : '/etc/docker/daemon.json',
-        LOG_FILE => $ENV{NIMBUS_LOG} // catfile($homeDir, 'nimbusapp.log'),
+        LOG_FILE => $ENV{NIMBUS_LOG} // catfile($nimbusHome, 'nimbusapp.log'),
         INSTALL => $ENV{NIMBUS_INSTALL_DIR} // dirname($0),
-        DOWNLOAD => $ENV{NIMBUS_DOWNLOAD_URL} // 'https://github.com/admpresales/nimbusapp/releases/latest/nimbusapp' . $isWin32 ? '.zip' : '.tar.gz',
+        DOWNLOAD => $ENV{NIMBUS_DOWNLOAD_URL} // 'https://github.com/admpresales/nimbusapp/releases/latest/download/nimbusapp' . ($isWin32 ? '.zip' : '.tar.gz'),
         HUB_API_BASE => $ENV{NIMBUS_HUB_API_BASE} // "https://hub.docker.com/v2",
-        NL => "\n"
+        INTELLIJ_MOUNT_HOME => $ENV{NIMBUS_INTELLIJ_HOME} // catfile( $userHome, 'IdeaProjects_docker' ),
+        INTELLIJ_MOUNT_M2   => $ENV{NIMBUS_INTELLIJ_MAVEN} // catfile( $userHome, '.m2' ),
+        NL => $isWin32 ? "\r\n" : "\n"
     );
 };
 
 my %command = (
     help => sub {
         usage();
-        exit scalar @_;
+        exit @_ > 1;
     },
     version => sub {
         info("Release Version: ", RELEASE_VERSION);
         info("Release Date: ", RELEASE_DATE);
+        0;
     },
+    update => \&update_version,
     up => prompt_first('CONFIRM_RECREATE', \&docker_app_compose),
     down => prompt_first('CONFIRM_DELETE', \&docker_compose),
     render => \&docker_app,
@@ -108,25 +107,77 @@ sub info    { _log  'INFO', @_; _output @_ unless $config{QUIET}; }
 sub warn    { _log  'WARN', @_; _output text_block('LABEL_WARN'), @_; }
 sub error   { _log 'ERROR', @_; _output text_block('LABEL_ERROR'), @_; }
 sub fatal   { _log 'FATAL', @_; _output text_block('LABEL_ERROR'), @_; exit 1; }
-sub usage   { _log 'FATAL', @_; _output @_, $config{NL}, text_block('USAGE'); exit scalar @_; }
+sub usage   { _log 'FATAL', @_; _output @_, (@_ ? $config{NL} : ''), text_block('USAGE'); exit 1; }
 
 # Load some text from the configuration document at the bottom of this file
-# This keeps huge blocks of gtext out of the code, which may or may not be useful
+# This keeps huge blocks of text out of the code, which may or may not be useful
+#
+# As this sub is used to handle error text, any errors should result in a 'die'
+#   instead of using the program's standard 'fatal'
 sub text_block($name, $params = {}) {
-    state $text     = YAML::XS::LoadFile(\*DATA);
-    state $template = Template->new(VARIABLES => {
-        RED => color('bold red'),
-        YELLOW => color('bold yellow'),
-        BOLD => color('bold'),
-        RESET => color('reset')
-    });
+    state $text = load_text();
+    state $template = Template::Tiny->new();
+    state $formatting = {
+        red => color('bold red'),
+        yellow => color('bold yellow'),
+        bold => color('bold'),
+        reset => color('reset')
+    };
 
-    $template->process(\$text->{$name}, $params, \my $output) || die $template->error;
+    die "Unknown message template: ${name}.\n" unless $text->{$name};
+
+    $params->@{keys %$formatting} = values %$formatting;
+
+    $template->process(\$text->{$name}, $params, \my $output) || die sprintf "Template error (%s): %s\n", $name, $template->error;
+
     return $output;
 }
 
+sub download($url, $context = 'Download error') {
+    my $res = HTTP::Tiny->new->get($url);
+
+    if (! $res->{success}) {
+        fatal $context, $config{NL},
+              "\t", join("\t", $url, $res->{status}, $res->{reason})
+    }
+    
+    $res->{content};
+}
+
+sub update_version {
+    my $archive = do {
+        my $content = download $config{DOWNLOAD};
+        
+        my $temp = File::Temp->new(UNLINK => 0);
+        print $temp $content;
+        close($temp);
+
+        $temp->filename;
+    };
+
+    debug("Temporary download location: ", $archive);
+    debug("Extracting to: ", $config{INSTALL});
+
+    my @extract = do {
+        if ($config{WINDOWS}) {
+            ('powershell', '-c', sprintf('Expand-Archive -Path "%s" -DestinationPath "%s"', $archive, $config{INSTALL}));
+        }
+        else {
+            my $dest = catfile($config{INSTALL}, 'nimbusapp');
+            ( (! -w $dest ? 'sudo' : ()), 'tar', 'xzf', $archive, '-C', $config{INSTALL});
+        }
+    };
+
+    debug("Running: ", @extract);
+    system(@extract);
+
+    fatal "Failed to extract '$archive'. Status: $?" if $?;
+
+    unlink($archive) if -f $archive
+}
+
 sub prompt($label, $params) {
-    return if $config{FORCE} || $params->{cmd} eq 'up' && grep { // } $params->{args}->@*;
+    return if $config{FORCE} || $params->{cmd} eq 'up' && grep { /--force-recreate/ } $params->{args}->@*;
 
     print STDERR text_block($label, $params) =~ s/[\n\r]+$//r, " [y/N] ";
 
@@ -153,7 +204,7 @@ sub prompt_first($label, $sub) {
 
 sub nimbusapp($params, @args) {
     my @result = do {
-        local $ENV{NIMBUS_INTERNAL} = 1;
+        local $ENV{NIMBUS_INTERNAL} = 1; # Prevent recursive logging
         my $a = join ' ', @args;
         qx{perl "$0" "$params->{originalImage}" -q $a}
     };
@@ -167,6 +218,36 @@ sub nimbusapp($params, @args) {
     }
 }
 
+sub apply_mounts($params) {
+    return unless $params->{intellij_home} || $params->{intellij_m2};
+    fatal "Mounts are currently only available for Intellij" unless $params->{image} eq 'intellij';
+    
+    my $compose = YAML::Tiny->read( $params->{composeFile} );
+
+    if ($params->{intellij_home}) {
+        push $compose->[0]->{services}->{intellij}->{volumes}->@*,
+            {
+                type => 'bind',
+                source => $config{INTELLIJ_MOUNT_HOME},
+                target => '/home/demo/IdeaProjects'
+            };
+    }
+
+    if ($params->{intellij_m2}) {
+        push $compose->[0]->{services}->{intellij}->{volumes}->@*,
+            {
+                type => 'bind',
+                source => $config{INTELLIJ_MOUNT_M2},
+                target => '/home/demo/.m2'
+            };
+    }
+
+    my $yaml = $compose->write_string( $params->{composeFile} );
+    $yaml =~ s/'(true|false|null)'/$1/g;
+
+    write_file( $params->{composeFile}, $yaml );
+}
+
 sub docker_app($cmd, $params, $args) {
     if ($cmd eq 'inspect') {
         my @command = ('docker-app', 'inspect', $params->{fullImage});
@@ -174,22 +255,34 @@ sub docker_app($cmd, $params, $args) {
         system(@command) or exit $?;
     }
     else { # Render
-        my @settings = map { ('-s', $_) } $params->{settings}->@*;
+        my @settings = map { ('-s', s/^(.*?)=(.*)$/$1="$2"/r) } $params->{settings}->@*;
         
         make_path($params->{composeDir}) unless -d $params->{composeDir};
 
-        open(my $compose, '>', $params->{composeFile}) or die "Could not open " . $params->{composeFile} . "\n";
+        my $temp = File::Temp->new(UNLINK => 0);
 
         my @command = ('docker-app', 'render', @settings, $params->{fullImage});
         debug("Running: ", join ' ', @command);
-        open(my $app, '-|', @command) or die "Could not run docker-app: $1";
+        open(my $app, '-|', @command) or fatal "Could not run docker-app: $! ($?)";
 
         while (defined(my $line = <$app>)) {
-            print $compose $line;
+            print $temp $line;
         }
 
-        close($app);
-        close($compose);
+        close($app);     my $rc = $? >> 8;
+        close($temp);
+
+        if ($rc) {
+            unlink($temp->filename);
+            if ($params->{tag} =~ /^(.*?)_/) {
+                warn "Image name contains an underscore which is not used by nimbusapp. ",
+                      sprintf "Try using %s/%s:%s instead.", $params->{org}, $params->{image}, $1;
+            }
+            fatal "Could not render."
+        }
+
+        move $temp->filename, $params->{composeFile} or fatal "Error moving compose file: $!";
+        apply_mounts($params);
 
         if ($cmd eq 'render') {
             print read_file $params->{composeFile};
@@ -224,12 +317,7 @@ sub list_tags($, $params, $) {
     my $url = sprintf("%s/repositories/%s/%s.dockerapp/tags", $config{HUB_API_BASE}, $params->{org}, $params->{originalImage});
     my $n = $params->{latest} // $params->{number} // DEFAULT_TAG_COUNT;
 
-    my $res = ua->get($url);
-
-    die "Error retrieving versions from Docker Hub: " . $res->status_line . $config{NL}
-        unless $res->is_success;
-
-    my $data = json->decode($res->content)->{results};
+    my $data = decode_json(download $url)->{results};
 
     print "$_", $config{NL} for
         grep { $n-- > 0 }
@@ -238,34 +326,59 @@ sub list_tags($, $params, $) {
         grep { $_->{name} !~ /-dev$/ } @$data;
 }
 
-sub load_app(%params) {
-    my $json = JSON::XS->new->utf8->pretty;
-
+sub read_app_config_json {
     if (-f $config{APPS_CONFIG}) {
-        my $jsonstr = read_file( $config{APPS_CONFIG} );
-        my $apps = $json->decode($jsonstr);
+        return decode_json(scalar read_file( $config{APPS_CONFIG} ));
+    }
 
-        if (defined(my $app = $apps->{$params{image}})) {
-            $params{$_} ||= $app->{$_} for qw(tag org);
+    return undef;
+}
+
+sub read_app_config_old {
+    return undef unless -f $config{APPS_OLD_CONFIG};
+
+    return {
+        map {
+            my %app;
+            @app{qw(org image tag)} = $_->@[1..3];
+            $_->[0] => \%app;
         }
+        grep { @$_ == 4 }
+        map { [ split qr/[\s:\/]/ ] }
+        read_file( $config{APPS_OLD_CONFIG} )
+    };
+}
+
+sub read_app_config {
+    if (-f $config{APPS_CONFIG}) {
+        read_app_config_json
+    }
+    elsif (-f $config{APPS_OLD_CONFIG}) {
+        read_app_config_old
+    }
+    else {
+        {};
+    }
+}
+
+sub load_app_config(%params) {
+    my $apps = read_app_config;
+
+    if (defined(my $app = $apps->{$params{project}})) {
+        $params{$_} ||= $app->{$_} for qw(tag org);
     }
 
     return %params;
 }
 
-sub save_app(%params) {
-    my $json = JSON->new->utf8->pretty;
-    my $apps;
-
-    if (-f $config{APPS_CONFIG}) {
-        $apps = $json->decode( scalar read_file($config{APPS_CONFIG}) );
-    }
+sub save_app_config(%params) {
+    my $apps = read_app_config;
 
     $apps->{$params{image}} = {
         map { $_ => $params{$_} } qw(image org tag)
     };
 
-    write_file $config{APPS_CONFIG}, $json->encode($apps);
+    write_file $config{APPS_CONFIG}, encode_json($apps);
 }
 
 sub get_dns_servers {
@@ -293,8 +406,7 @@ sub restart_docker {
 # Ensure docker networking is set up
 # { "dns": [ "192.168.61.2" ] }
 if ($config{WINDOWS}) {
-    my $json = JSON->new->utf8->pretty;
-    my $daemon = -f $config{DAEMON_CONFIG} ? $json->decode( scalar read_file($config{DAEMON_CONFIG}) ) : {};
+    my $daemon = -f $config{DAEMON_CONFIG} ? decode_json( scalar read_file($config{DAEMON_CONFIG}) ) : {};
 
     if (!defined $daemon->{dns} || @{$daemon->{dns}} == 0) {
         info text_block('DNS_START', {});
@@ -302,7 +414,7 @@ if ($config{WINDOWS}) {
 
         if (@dns) {
             $daemon->{dns} = [ @dns ];
-            write_file( $config{DAEMON_CONFIG}, $json->encode($daemon) );
+            write_file( $config{DAEMON_CONFIG}, encode_json($daemon) );
             info text_block('DNS_COMPLETE', { servers => [ @dns ], file => $config{DAEMON_CONFIG} });
             restart_docker();
         } else {
@@ -319,17 +431,20 @@ sub build_re {
 my %re = (
     # Returns org, image, tag
     image => qr{
-        ^(?:  (?<org>  .*  )\/ )?      # Optional org
-              (?<image> .*? )           # Image
-         (?: :(?<tag>   .*  )   )? $    # Optional tag
-        }xx,
-
+        ^(?:  (?<org>   [a-z0-9]{4,30}  ) \/ )?             # Optional org  (lowercase + numbers)
+              (?<image> [a-z0-9][a-z0-9_.-]+ )              # Image         (lowercase + numbers + limited special)
+         (?: :(?<tag>   [a-zA-Z0-9][a-zA-Z0-9_.-]+ ) )? $   # Optional tag  (lower/upper + numbers + limited special)
+    }xx,
+    
     # Options
     set => build_re(qw(-s --set)),
     debug => build_re(qw(-d --debug)),
     force => build_re(qw(-f --force)),
     quiet => build_re(qw(-q --quiet)),
-    unsupported => build_re(qw(-v -m -p --preserve-volumes)),
+    intellij_home => build_re('-v'),
+    intellij_m2 => build_re('-m'),
+    project => build_re('-p'),
+    preserve_volumes => build_re('--preserve-volumes'),
     number => build_re(qw(-n --number)),
     latest => build_re(qw(--latest))
 );
@@ -337,18 +452,18 @@ my %re = (
 usage unless @ARGV;
 _log 'CMD', join(' ', @ARGV);
 
+if ($ARGV[0] =~ /^-?-?(help|version|update)$/) {
+    exit ($command{$1}->() // 0);
+}
+
 my %params = do {
-    # First arg, minus any leading dashes
-    my $img = shift =~ s/^--?//r;
-
-    # Immediately run nimbusapp [ help|version ]
-    if (defined $command{$img}) {
-        exit ($command{$img}->() // 0);
+    if ($ARGV[0] =~ $re{image}) {
+        shift;
+        %+;
     }
-
-    # Not a command, treat it like an image name
-    usage "Invalid image name: $img" unless $img =~ $re{image};
-    %+;
+    else {
+        ();
+    }
 };
 
 while (@ARGV > 0) {
@@ -357,6 +472,28 @@ while (@ARGV > 0) {
     if ($arg =~ $re{set}) {
         push $params{settings}->@*, shift;
     }
+    elsif ($arg =~ $re{project}) {
+        $params{project} = shift;
+    }
+    elsif ($arg =~ $re{latest}) {
+        $params{latest} = 1;
+    }
+    elsif ($arg =~ $re{number}) {
+        $params{number} = shift;
+    }
+
+    # Volumes
+    elsif ($arg =~ $re{intellij_home}) {
+        $params{intellij_home} = 1;
+    }
+    elsif ($arg =~ $re{intellij_m2}) {
+        $params{intellij_m2} = 1;
+    }
+    elsif ($arg =~ $re{preserve_volumes}) {
+        $params{preserve_volumes} = 1;
+    }
+
+    # Global configurations
     elsif ($arg =~ $re{debug}) {
         $config{DEBUG}++;
     }
@@ -366,19 +503,19 @@ while (@ARGV > 0) {
     elsif ($arg =~ $re{quiet}) {
         $config{QUIET}++;
     }
-    elsif ($arg =~ $re{unsupported}) {
-        fatal 'This version of nimbusapp does not support ', $arg;
-    }
-    elsif ($arg =~ $re{latest}) {
-        $params{latest} = 1;
-    }
-    elsif ($arg =~ $re{number}) {
-        $params{number} = shift;
-    }
-    elsif (defined $command{$arg}) {
-        %params = load_app(%params);
 
-        usage(1) if not defined $params{image};
+    elsif (defined $command{$arg}) {
+        if (not defined $params{project}) {
+            if (not defined $params{image}) {
+                usage("No image or project specified.");
+            }
+
+            $params{project} = $params{image};
+        }
+
+        %params = load_app_config(%params);
+
+        usage("No image found.") if not defined $params{image};
 
         $params{org} //= $config{DEFAULT_ORG};
         $params{composeDir} = catfile($config{CACHE}, $params{image});
@@ -388,13 +525,13 @@ while (@ARGV > 0) {
         $params{args} = [ @ARGV ];
 
         if ($arg ne 'tags') {
-            fatal text_block('MISSING_VERSION', \%params) if $arg ne 'tags' and not defined $params{tag};
+            fatal text_block('MISSING_VERSION', \%params) if not defined $params{tag};
             $params{fullImage} = sprintf "%s/%s.dockerapp:%s", @params{qw(org image tag)};
             info 'Using: ', $params{fullImage};
         }
 
         my $rc = $command{$arg}->($arg, \%params, \@ARGV);
-        save_app(%params) if $rc == 0;
+        save_app_config(%params) if $rc == 0;
         exit $rc;
     }
     else {
@@ -402,88 +539,96 @@ while (@ARGV > 0) {
     }
 }
 
-__DATA__
-LABEL_WARN: "[% YELLOW %]WARNING[% RESET %]"
-LABEL_ERROR: "[% RED %]ERROR[% RESET %]"
+usage "No command found";
 
-DNS_START: "No Docker DNS configuration found, attempting to configure DNS servers."
+sub load_text {
+return {
+LABEL_WARN => '[% yellow %]WARNING:[% reset %] ',
+LABEL_ERROR => '[% red %]ERROR:[% reset %] ',
 
-DNS_COMPLETE: |
-    Docker DNS servers have been configured to use the following addresses:
-    [% FOREACH server IN servers %]
-        [% server %]
-    [% END %]
+DNS_START => 'No Docker DNS configuration found, attempting to configure DNS servers.',
 
-    Docker DNS settings can be reviewed in [% file %]
+DNS_COMPLETE => q{
+Docker DNS servers have been configured to use the following addresses:
+[% FOREACH server IN servers %]
+    [% server %]
+[% END %]
 
-MISSING_DNS: |
-    No DNS servers found, Docker containers may not be able to communicate with other servers.
-    Docker DNS settings can be found in [% file %]
+Docker DNS settings can be reviewed in [% file %]
+},
 
-MISSING_VERSION: |
-    No version number specified!
+MISSING_DNS => q{No DNS servers found, Docker containers may not be able to communicate with other servers.
+Docker DNS settings can be found in [% file %]
+},
 
-    If this is your first time using [% originalImage %], please specify a version number:
+MISSING_VERSION => q{No version number specified!
 
-    nimbusapp [% originalImage %]:<version_number> [% cmd %]
+If this is your first time using [% originalImage %], please specify a version number:
 
-    The version number you choose will be remembered for future commands.
+nimbusapp [% originalImage %]:<version_number> [% cmd %]
 
-CONFIRM_DELETE: |
-    [% BOLD %]This action will [% RED %]DELETED[% RESET %][% BOLD %] your containers and is [% RED %]IRREVERSIBLE[% RESET %]!
+The version number you choose will be remembered for future commands.
+},
+
+CONFIRM_DELETE => q{
+[% bold %]This action will [% red %]DELETED[% reset %][% bold %] your containers and is [% red %]IRREVERSIBLE[% reset %]!
+
+[% bold %]You may wish to use [% reset %]`nimbusapp [% originalImage %] stop'[% bold %] to shut down your containers without deleting them[% reset %]
     
-    [% BOLD %]You may wish to use [% RESET %]`nimbusapp [% originalImage %] stop'[% BOLD %] to shut down your containers without deleting them[% RESET %]
-    
-    [% BOLD %]The following containers will be deleted:[% RESET %]
-    [% FOREACH item IN containers -%]
-        - [% item %]
-    [% END -%]
+[% bold %]The following containers will be deleted:[% reset %]
+[% FOREACH item IN containers -%]
+    - [% item %]
+[% END -%]
 
-    [% RED %]Do you wish to DELETE these containers?[% RESET %]
+[% red %]Do you wish to DELETE these containers?[% reset %]
+},
 
-CONFIRM_RECREATE: |
-    [% BOLD %]This action may cause one or more of your containers to be [% RED %]DELETED[% RESET %][% BOLD %] and [% RED %]RECREATED[% RESET %].
-    
-    [% BOLD %]Recreating containers is normal when changing their configuration, such as image, tag or ports.[% RESET %]
-    
-    [% BOLD %]You may wish to use [% RESET %]`nimbusapp [% originalImage %] start'[% BOLD %] to start your existing containers.[% RESET %]
-    
-    [% C_BOLD %]The following containers may be recreated:[% RESET %]
-    [% FOREACH item IN containers -%]
-        - [% item %]
-    [% END -%]
+CONFIRM_RECREATE => q{
+[% bold %]This action may cause one or more of your containers to be [% red %]DELETED[% reset %][% bold %] and [% red %]RECREATED[% reset %].
 
-    [% RED %]Some or all containers may be recreated, do you wish to continue?[% RESET %]
+[% bold %]Recreating containers is normal when changing their configuration, such as image, tag or ports.[% reset %]
 
-USAGE: |
-    Usage: nimbusapp <IMAGE>[:<VERSION>] [OPTIONS] COMMAND [CMD OPTIONS]
+[% bold %]You may wish to use [% reset %]`nimbusapp [% originalImage %] start'[% bold %] to start your existing containers.[% reset %]
 
-    Options:
-        IMAGE       The Docker App file you wish to run. If no repository is provided, admpresales is assumed.
-        VERSION     The version of the Docker App file you wish to run.
-                    Only required the first time a container is created, and will be cached for future use.
-        -d, --debug Enable debugging output (use twice for verbose bash commands)
-        -f, --force Skip all prompts - Use with caution, this option will happily delete your data without warning
-        -s, --set   Enables you to set(override) default arguments
-        --version   Print the version of nimbusapp and exit
+[% bold %]The following containers may be recreated:[% reset %]
+[% FOREACH item IN containers -%]
+    - [% item %]
+[% END -%]
 
-    Commands:
-        down     Stop and remove containers
-        help     Prints this help message
-        inspect  Shows metadata and settings for a given application
-        logs     Shows logs for containers
-        ps       Lists containers
-        pull     Pull service images
-        render   Render the Compose file for the application
-        rm       Remove stopped containers
-        restart  Restart containers
-        start    Start existing containers
-        stop     Stop existing containers
-        up       Creates and start containers
-        version  Prints version information
+[% red %]Some or all containers may be recreated, do you wish to continue?[% reset %]
+},
 
-    Command Options:
-        up  --no-start       Create containers without starting them
-            --force-recreate Force all containers to be re-created
-            --no-recreate    Do not allow any containers to be re-created
-    
+USAGE => q{
+Usage: nimbusapp <IMAGE>[:<VERSION>] [OPTIONS] COMMAND [CMD OPTIONS]
+
+Options:
+    IMAGE       The Docker App file you wish to run. If no repository is provided, admpresales is assumed.
+    VERSION     The version of the Docker App file you wish to run.
+                Only required the first time a container is created, and will be cached for future use.
+    -d, --debug Enable debugging output (use twice for verbose bash commands)
+    -f, --force Skip all prompts - Use with caution, this option will happily delete your data without warning
+    -s, --set   Enables you to set(override) default arguments
+    --version   Print the version of nimbusapp and exit
+
+Commands:
+    down     Stop and remove containers
+    help     Prints this help message
+    inspect  Shows metadata and settings for a given application
+    logs     Shows logs for containers
+    ps       Lists containers
+    pull     Pull service images
+    render   Render the Compose file for the application
+    rm       Remove stopped containers
+    restart  Restart containers
+    start    Start existing containers
+    stop     Stop existing containers
+    up       Creates and start containers
+    version  Prints version information
+
+Command Options:
+    up  --no-start       Create containers without starting them
+        --force-recreate Force all containers to be re-created
+        --no-recreate    Do not allow any containers to be re-created
+}
+}
+}

@@ -23,6 +23,7 @@ function teardown() {
 
 # Bug where project is deleted if it begins with image name
 @test "1.3.3: Project Delete Regression" {
+    skip
     : > "$NIMBUS_BASEDIR/apps.config"
 
     local count
