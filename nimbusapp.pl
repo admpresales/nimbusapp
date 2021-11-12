@@ -1,5 +1,9 @@
 #!/usr/bin/env perl
 
+# TODOS
+#  * Import cached compose files from previous location (Linux)
+#  * Preserve volumes functionality
+
 use 5.020;
 use strict;
 use warnings;
@@ -16,6 +20,7 @@ use YAML::Tiny;     # Docker compose
 use HTTP::Tiny;     # Download update, tags
 use Template::Tiny; # Text content
 
+use Getopt::Long;
 use Time::Piece;
 use Sort::Versions;
 
@@ -66,7 +71,7 @@ my %config = do {
     );
 };
 
-my %command = (
+my %dispatch = (
     help => sub {
         usage();
         exit @_ > 1;
@@ -84,7 +89,7 @@ my %command = (
     tags => \&list_tags
 );
 
-$command{$_} = \&docker_compose for qw( pull start stop restart rm ps logs exec );
+$dispatch{$_} = \&docker_compose for qw( pull start stop restart rm ps logs exec );
 
 # Output functions
 # Everything except docker-{compose,app} output goes to STDERR
@@ -107,7 +112,7 @@ sub info    { _log  'INFO', @_; _output @_ unless $config{QUIET}; }
 sub warn    { _log  'WARN', @_; _output text_block('LABEL_WARN'), @_; }
 sub error   { _log 'ERROR', @_; _output text_block('LABEL_ERROR'), @_; }
 sub fatal   { _log 'FATAL', @_; _output text_block('LABEL_ERROR'), @_; exit 1; }
-sub usage   { _log 'FATAL', @_; _output @_, (@_ ? $config{NL} : ''), text_block('USAGE'); exit 1; }
+sub usage   { _log 'FATAL', @_; _output @_ ? (text_block('LABEL_ERROR'), @_, $config{NL}) : '', text_block('USAGE'); exit 1; }
 
 # Load some text from the configuration document at the bottom of this file
 # This keeps huge blocks of text out of the code, which may or may not be useful
@@ -255,7 +260,9 @@ sub docker_app($cmd, $params, $args) {
         system(@command) or exit $?;
     }
     else { # Render
-        my @settings = map { ('-s', s/^(.*?)=(.*)$/$1="$2"/r) } $params->{settings}->@*;
+        my @settings = map { 
+            ('-s', sprintf '%s="%s"', $_, $params->{set}{$_})
+        } keys $params->{set}->%*;
         
         make_path($params->{composeDir}) unless -d $params->{composeDir};
 
@@ -423,123 +430,89 @@ if ($config{WINDOWS}) {
     }
 }
 
-sub build_re {
-    my $opts = join "|", @_;
-    return qr/^($opts)$/;
-}
+my $image_re = qr{
+    ^(?:  (?<org>   [a-z0-9]{4,30}  ) \/ )?             # Optional org  (lowercase + numbers)
+          (?<image> [a-z0-9][a-z0-9_.-]+ )              # Image         (lowercase + numbers + limited special)
+     (?: :(?<tag>   [a-zA-Z0-9][a-zA-Z0-9_.-]+ ) )? $   # Optional tag  (lower/upper + numbers + limited special)
+}xx;
 
-my %re = (
-    # Returns org, image, tag
-    image => qr{
-        ^(?:  (?<org>   [a-z0-9]{4,30}  ) \/ )?             # Optional org  (lowercase + numbers)
-              (?<image> [a-z0-9][a-z0-9_.-]+ )              # Image         (lowercase + numbers + limited special)
-         (?: :(?<tag>   [a-zA-Z0-9][a-zA-Z0-9_.-]+ ) )? $   # Optional tag  (lower/upper + numbers + limited special)
-    }xx,
-    
-    # Options
-    set => build_re(qw(-s --set)),
-    debug => build_re(qw(-d --debug)),
-    force => build_re(qw(-f --force)),
-    quiet => build_re(qw(-q --quiet)),
-    intellij_home => build_re('-v'),
-    intellij_m2 => build_re('-m'),
-    project => build_re('-p'),
-    preserve_volumes => build_re('--preserve-volumes'),
-    number => build_re(qw(-n --number)),
-    latest => build_re(qw(--latest))
+my %params = (
+    debug => \$config{DEBUG},
+    force => \$config{FORCE},
+    quiet => \$config{QUIET},
+    org => $config{DEFAULT_ORG},
+    set => {}
 );
 
 usage unless @ARGV;
 _log 'CMD', join(' ', @ARGV);
 
-if ($ARGV[0] =~ /^-?-?(help|version|update)$/) {
-    exit ($command{$1}->() // 0);
-}
+my $command;
+{
+    local $SIG{__WARN__} = \&usage;
 
-my %params = do {
-    if ($ARGV[0] =~ $re{image}) {
-        shift;
-        %+;
-    }
-    else {
-        ();
-    }
-};
+    GetOptions( \%params, 
+        'project|p=s',
+        'intellij_home|v', 'intellij_m2|m', 'preserve_volumes',
+        'debug|d', 'quiet|q', 'force|f',
+        'number|n=i', 'latest',
+        'set|s=s%',
+        '<>' => sub {
+            state $image;
+            if (!defined $image) {
+                $image = shift;
 
-while (@ARGV > 0) {
-    my $arg = shift;
-
-    if ($arg =~ $re{set}) {
-        push $params{settings}->@*, shift;
-    }
-    elsif ($arg =~ $re{project}) {
-        $params{project} = shift;
-    }
-    elsif ($arg =~ $re{latest}) {
-        $params{latest} = 1;
-    }
-    elsif ($arg =~ $re{number}) {
-        $params{number} = shift;
-    }
-
-    # Volumes
-    elsif ($arg =~ $re{intellij_home}) {
-        $params{intellij_home} = 1;
-    }
-    elsif ($arg =~ $re{intellij_m2}) {
-        $params{intellij_m2} = 1;
-    }
-    elsif ($arg =~ $re{preserve_volumes}) {
-        $params{preserve_volumes} = 1;
-    }
-
-    # Global configurations
-    elsif ($arg =~ $re{debug}) {
-        $config{DEBUG}++;
-    }
-    elsif ($arg =~ $re{force}) {
-        $config{FORCE}++;
-    }
-    elsif ($arg =~ $re{quiet}) {
-        $config{QUIET}++;
-    }
-
-    elsif (defined $command{$arg}) {
-        if (not defined $params{project}) {
-            if (not defined $params{image}) {
-                usage("No image or project specified.");
+                if ($image =~ /^-?-?(help|version|update)$/) {
+                    exit ($dispatch{$1}->() // 0)
+                }
+                elsif ($image =~ $image_re) {
+                    @params{keys %+} = values %+;
+                }
+                else {
+                    die "Invalid image format: $image\n";
+                }
             }
-
-            $params{project} = $params{image};
+            else {
+                $command = shift;
+                unshift @ARGV, '--'; # die('!FINISH');
+            }
         }
-
-        %params = load_app_config(%params);
-
-        usage("No image found.") if not defined $params{image};
-
-        $params{org} //= $config{DEFAULT_ORG};
-        $params{composeDir} = catfile($config{CACHE}, $params{image});
-        $params{composeFile} = catfile($params{composeDir}, COMPOSE_FILE);
-        $params{cmd} = $arg;
-        $params{originalImage} = $params{image};
-        $params{args} = [ @ARGV ];
-
-        if ($arg ne 'tags') {
-            fatal text_block('MISSING_VERSION', \%params) if not defined $params{tag};
-            $params{fullImage} = sprintf "%s/%s.dockerapp:%s", @params{qw(org image tag)};
-            info 'Using: ', $params{fullImage};
-        }
-
-        my $rc = $command{$arg}->($arg, \%params, \@ARGV);
-        save_app_config(%params) if $rc == 0;
-        exit $rc;
-    }
-    else {
-        usage "Unknown option: $arg";
-    }
+    ) or usage "Error parsing command line options options.";
 }
 
-usage "No command found";
+if (not defined $params{project}) {
+    if (not defined $params{image}) {
+        usage("No image or project specified.");
+    }
+
+    $params{project} = $params{image};
+}
+
+%params = load_app_config(%params);
+
+usage("No image found.") if not defined $params{image};
+$params{composeDir} = catfile($config{CACHE}, $params{image});
+$params{composeFile} = catfile($params{composeDir}, COMPOSE_FILE);
+$params{cmd} = $command;
+$params{originalImage} = $params{image};
+$params{args} = [ @ARGV ];
+
+if (!defined $command) {
+    usage "Please specify a command.";
+}
+elsif (!defined $dispatch{$command}) {
+    usage "Unknown command: $command";
+}
+elsif ($command ne 'tags') {
+    fatal text_block('MISSING_VERSION', \%params) if not defined $params{tag};
+    $params{fullImage} = sprintf "%s/%s.dockerapp:%s", @params{qw(org image tag)};
+    info 'Using: ', $params{fullImage};
+}
+
+my $rc = $dispatch{$command}->($command, \%params, \@ARGV);
+save_app_config(%params) if $rc == 0;
+exit $rc;
+
 
 sub load_text {
 return {
