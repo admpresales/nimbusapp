@@ -1,7 +1,6 @@
 #!/usr/bin/env perl
 
 # TODOS
-#  * Import cached compose files from previous location (Linux)
 #  * Preserve volumes functionality
 
 use 5.020;
@@ -301,6 +300,17 @@ sub docker_app($cmd, $params, $args) {
 
 sub docker_compose($cmd, $params, $args) {
     if (! -f $params->{composeFile}) {
+        my $oldComposeFile = catfile($config{CACHE}, $params->@{qw(project org image tag)}, $params->{image} . '.yml');
+
+        if (-f $oldComposeFile 
+            && move($oldComposeFile, $params->{composeFile})) {
+            
+            info "Importing configuration from previous version of nimbusapp";
+        }
+        else {
+            if ($!) {
+                debug "Error importing old config: $!";
+            }
         my $rc = docker_app($cmd, $params, $args);
         return $rc if $rc;
     }
