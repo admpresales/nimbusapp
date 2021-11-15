@@ -1,8 +1,5 @@
 #!/usr/bin/env perl
 
-# TODOS
-#  * Preserve volumes functionality
-
 use 5.020;
 use strict;
 use warnings;
@@ -311,13 +308,32 @@ sub docker_compose($cmd, $params, $args) {
             if ($!) {
                 debug "Error importing old config: $!";
             }
-        my $rc = docker_app($cmd, $params, $args);
-        return $rc if $rc;
+
+            my $rc = docker_app($cmd, $params, $args);
+            return $rc if $rc;
+        }
+    }
+    
+    if ($cmd eq 'up') {
+        # Start in background by default (exclusive with --no-start)
+        unshift @$args, '-d' unless grep { $_ eq '--no-start' || $_ eq '-d' } @$args;
+
+        # Re-initialize anonymous volumes
+        unshift @$args, '-V' unless $params->{preserve_volumes} || grep { $_ eq '-V' } @$args;
+
+        # Remove orphan containers
+        unshift @$args, '--remove-orphans' unless grep { $_ eq '--remove-orphans' } @$args;
     }
 
-    unshift @$args, '-d' if $cmd eq 'up' && ! grep { $_ eq '--no-start' } @$args;
+    if ($cmd eq 'down') {
+        # Remove named an anonymous volumes with the container
+        unshift @$args, '-v' unless $params->{preserve_volumes} || grep { $_ eq '-v' } @$args;
 
-    my @compose = ( 'docker-compose', '-f', $params->{composeFile}, '-p', $params->{image}, $cmd, @$args );
+        # Remove orphan containers
+        unshift @$args, '--remove-orphans' unless grep { $_ eq '--remove-orphans' } @$args;
+    }
+
+    my @compose = ( 'docker-compose', '-f', $params->{composeFile}, '-p', $params->{project}, $cmd, @$args );
     debug("Running: ", join ' ', @compose);
     system @compose;
 
