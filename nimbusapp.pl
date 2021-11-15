@@ -372,7 +372,8 @@ sub load_app_config(%params) {
     my $apps = read_app_config;
 
     if (defined(my $app = $apps->{$params{project}})) {
-        $params{$_} ||= $app->{$_} for qw(tag org);
+        $params{$_} ||= $app->{$_} for qw(image tag org);
+        $params{image} = $app->{image} if $params{project} eq $params{image};
     }
 
     return %params;
@@ -381,7 +382,7 @@ sub load_app_config(%params) {
 sub save_app_config(%params) {
     my $apps = read_app_config;
 
-    $apps->{$params{image}} = {
+    $apps->{$params{project}} = {
         map { $_ => $params{$_} } qw(image org tag)
     };
 
@@ -488,13 +489,15 @@ if (not defined $params{project}) {
     $params{project} = $params{image};
 }
 
+$params{originalImage} = $params{image};
+
 %params = load_app_config(%params);
 
 usage("No image found.") if not defined $params{image};
-$params{composeDir} = catfile($config{CACHE}, $params{image});
+$params{originalImage} ||= $params{image};
+$params{composeDir} = catfile($config{CACHE}, $params{project});
 $params{composeFile} = catfile($params{composeDir}, COMPOSE_FILE);
 $params{cmd} = $command;
-$params{originalImage} = $params{image};
 $params{args} = [ @ARGV ];
 
 if (!defined $command) {
@@ -505,6 +508,7 @@ elsif (!defined $dispatch{$command}) {
 }
 elsif ($command ne 'tags') {
     fatal text_block('MISSING_VERSION', \%params) if not defined $params{tag};
+
     $params{fullImage} = sprintf "%s/%s.dockerapp:%s", @params{qw(org image tag)};
     info 'Using: ', $params{fullImage};
 }
