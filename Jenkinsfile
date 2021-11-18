@@ -71,6 +71,7 @@ pipeline {
         stage('Build') {
             steps {
                 sh """
+                set -x
                 docker build . -t nimbusapp-builder:${env.BRANCH_NAME}
                 docker run --rm -v "\$PWD:/app" -w /app nimbusapp-builder:${env.BRANCH_NAME} perl build.pl ${env.BRANCH_NAME}
                 """
@@ -89,7 +90,7 @@ pipeline {
                     docker version
                     docker-compose version
                     docker-app version
-                    ./nimbusapp version
+                    ./build/linux/nimbusapp version
                 ) 2>&1 | tee test-versions.txt
                 '''
             }
@@ -99,9 +100,10 @@ pipeline {
             steps {
                 lock('nimbusapp-test') {
                     sh '''
+                        set -x
                         export PATH="$PWD/bats-core/bin:$PWD/bats-core/libexec/bats-core:$PATH"
                         export NIMBUS_EXE="nimbusapp"
-                        perlbrew use 5.20.3
+                        /opt/perl5/bin/perlbrew use perl-5.20.3
                         cd build/linux
                         bats tests --tap | tee bats-tap.log
                     '''
