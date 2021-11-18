@@ -69,14 +69,11 @@ pipeline {
         } // Docker Hub
 
         stage('Build') {
-            agent {
-                dockerfile {
-                    reuseNode true
-                    label 'linux'
-                }
-            }
             steps {
-                sh 'perl build.pl ${env.BRANCH_NAME}'
+                sh """
+                docker build . -t nimbusapp-builder:${env.BRANCH_NAME}
+                docker run --rm -v "\$PWD:/app" -w /app nimbusapp-builder:${env.BRANCH_NAME} perl build.pl ${env.BRANCH_NAME}
+                """
             }
         }
 
@@ -103,6 +100,9 @@ pipeline {
                 lock('nimbusapp-test') {
                     sh '''
                         export PATH="$PWD/bats-core/bin:$PWD/bats-core/libexec/bats-core:$PATH"
+                        export NIMBUS_EXE="nimbusapp"
+                        perlbrew use 5.20.3
+                        cd build/linux
                         bats tests --tap | tee bats-tap.log
                     '''
                 }
