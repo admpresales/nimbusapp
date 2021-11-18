@@ -52,10 +52,10 @@ pipeline {
                     // Assumptions:
                     //  - Github and Docker Hub organizations match
                     //  - Job is in root folder of this instance
-                    pushOpts = $/--namespace "${env.JOB_NAME.split('/')[0]}"/$
+                    pushOpts = """ --namespace "${env.JOB_NAME.split('/')[0]}" """
 
                     if (params.DOCKERAPP_FORCE_PUSH && params.DOCKERAPP_TAG) {
-                        pushOpts += $/ --tag "${params.DOCKERAPP_TAG}"/$
+                        pushOpts += """ --tag "${params.DOCKERAPP_TAG}" """
                     }
                 }
 
@@ -69,15 +69,14 @@ pipeline {
         } // Docker Hub
 
         stage('Build') {
-            steps {
-                script {
-                    releaseDate = new Date().format('YYYY-MM-dd')
+            agent {
+                dockerfile {
+                    reuseNode true
+                    label 'linux'
                 }
-
-                sh """
-                    sed -i -e 's#\\(readonly NIMBUS_RELEASE_VERSION=\\).*#\\1"${env.BRANCH_NAME}"#' \\
-                           -e 's#\\(readonly NIMBUS_RELEASE_DATE=\\).*#\\1"${releaseDate}"#' nimbusapp
-                """
+            }
+            steps {
+                sh 'perl build.pl ${env.BRANCH_NAME}'
             }
         }
 
@@ -89,6 +88,7 @@ pipeline {
                 sh '''
                 (
                     set -x
+                    perl -V
                     docker version
                     docker-compose version
                     docker-app version
