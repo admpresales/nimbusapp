@@ -1,3 +1,5 @@
+@Library("nimbus-pipeline-library") _
+
 pipeline {
     agent { label 'linux' }
 
@@ -19,11 +21,7 @@ pipeline {
         stage('Notify Start') {
             steps {
                 script {
-                    slackSend(
-                        channel: 'nimbus',
-                        message: "${env.JOB_NAME} - ${currentBuild.displayName} ${currentBuild.buildCauses[0].shortDescription} (<${env.JOB_URL}|Open>)",
-                        color: (currentBuild.previousBuild?.result == 'SUCCESS') ? 'good' : 'danger'
-                    )
+                    notifyStart()
                 }
             }
         }
@@ -119,20 +117,13 @@ pipeline {
 
         stage('Archive') {
             steps {
-                sh '''
-                tar -czvf nimbusapp.tar.gz nimbusapp
-                '''
-                archiveArtifacts artifacts: 'nimbusapp,nimbusapp.tar.gz,bats-tap.log,test-versions.txt'
+                archiveArtifacts artifacts: 'build/linux/nimbusapp.tar.gz,build/win32/nimbusapp.zip,bats-tap.log,test-versions.txt'
             }
         } // Archive
     } // stages
     post {
         always {
-            slackSend(
-                channel: 'nimbus',
-                message: "${env.JOB_NAME} - ${currentBuild.displayName} *${currentBuild.currentResult}* in ${currentBuild.durationString.replaceAll(' and counting', '')}" + ((currentBuild.currentResult != 'SUCCESS') ? " (<${env.BUILD_URL}console|Console>)" : ''),
-                color: (currentBuild.currentResult == 'SUCCESS') ? 'good' : 'danger'
-            )
+            notifyComplete()
         }
     } // post
 } // pipeline
