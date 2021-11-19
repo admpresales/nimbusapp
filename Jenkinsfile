@@ -103,11 +103,10 @@ pipeline {
                         set -x
 
                         export PATH="$PWD/bats-core/bin:$PWD/bats-core/libexec/bats-core:$PATH"
-                        export NIMBUS_EXE="nimbusapp"
+                        export NIMBUS_EXE="./build/linux/nimbusapp"
                         export PERLBREW_ROOT=/opt/perl5
 
-                        cd build/linux
-                        /opt/perl5/bin/perlbrew exec --with 5.20.3 bats ../../tests --tap | tee bats-tap.log
+                        /opt/perl5/bin/perlbrew exec --with 5.20.3 bats tests --tap | tee bats-tap.log
                     '''
                 }
             }
