@@ -106,6 +106,7 @@ copy('../nimbusapp.bat', 'win32');
 make_path('linux');
 copy('nimbusapp.packed.pl', 'linux/nimbusapp');
 chdir('linux');
+chmod 0755, 'nimbusapp';
 system(qw(tar cvzf nimbusapp.tar.gz nimbusapp)) == 0 or die "Creating tar.gz file failed ($?)";
 chdir('..');
 
