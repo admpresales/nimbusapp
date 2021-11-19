@@ -101,11 +101,13 @@ pipeline {
                 lock('nimbusapp-test') {
                     sh '''
                         set -x
+                        
                         export PATH="$PWD/bats-core/bin:$PWD/bats-core/libexec/bats-core:$PATH"
                         export NIMBUS_EXE="nimbusapp"
-                        /opt/perl5/bin/perlbrew use perl-5.20.3
+                        export PERLBREW_ROOT=/opt/perl5
+
                         cd build/linux
-                        bats tests --tap | tee bats-tap.log
+                        /opt/perl5/bin/perlbrew exec --with 5.20.3 bats tests --tap | tee bats-tap.log
                     '''
                 }
             }
