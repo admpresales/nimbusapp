@@ -26,6 +26,9 @@ use Term::ANSIColor;
 no if $] < 5.024, qw( warnings experimental::postderef );
 use feature 'postderef';
 
+no if $] < 5.026, qw( warnings experimental::lexical_subs );
+use feature 'lexical_subs';
+
 no warnings 'experimental::signatures';
 use feature 'signatures';
 
@@ -68,10 +71,7 @@ my %config = do {
 };
 
 my %dispatch = (
-    help => sub {
-        usage();
-        exit @_ > 1;
-    },
+    help => sub { usage(); },
     version => sub {
         info("Release Version: ", RELEASE_VERSION);
         info("Release Date: ", RELEASE_DATE);
@@ -477,6 +477,7 @@ _log 'CMD', join(' ', @ARGV);
 my $command;
 {
     local $SIG{__WARN__} = \&usage;
+    my sub dispatch_exit { exit ($dispatch{$_[0]}->(@_) // 0); }
 
     GetOptions( \%params, 
         'project|p=s',
@@ -484,19 +485,20 @@ my $command;
         'debug|d', 'quiet|q', 'force|f',
         'number|n=i', 'latest',
         'set|s=s%',
+        ( map { $_ => \&dispatch_exit } qw(help update version) ),
         '<>' => sub {
             state $image;
             if (!defined $image) {
                 $image = shift;
 
-                if ($image =~ /^-?-?(help|version|update)$/) {
-                    exit ($dispatch{$1}->() // 0)
+                if ($image =~ /^(help|version|update)$/) {
+                    dispatch_exit($1);
                 }
                 elsif ($image =~ $image_re) {
                     @params{keys %+} = values %+;
                 }
                 else {
-                    die "Invalid image format: $image\n";
+                    usage "Invalid image format: $image";
                 }
             }
             else {
