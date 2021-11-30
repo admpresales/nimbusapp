@@ -177,8 +177,8 @@ sub update_version {
     unlink($archive) if -f $archive
 }
 
-sub prompt($label, $params) {
-    return if $config{FORCE} || $params->{cmd} eq 'up' && grep { /--force-recreate/ } $params->{args}->@*;
+sub prompt($label, $params = {}) {
+    return if $config{FORCE} || $params->{cmd} && $params->{args} && $params->{cmd} eq 'up' && grep { /--force-recreate/ } $params->{args}->@*;
 
     print STDERR text_block($label, $params) =~ s/[\n\r]+$//r, " [y/N] ";
 
