@@ -19,9 +19,10 @@ use Template::Tiny; # Text content
 use Getopt::Long;
 use Time::Piece;
 use Sort::Versions;
-
-use if $^O eq 'MSWin32', 'Win32::Console::ANSI';
 use Term::ANSIColor;
+
+use if $^O eq 'MSWin32',   'Win32::Console::ANSI';
+use if $^O eq 'MSWin32', qw'Win32::ShellQuote quote_system';
 
 no if $] < 5.024, qw( warnings experimental::postderef );
 use feature 'postderef';
@@ -155,7 +156,7 @@ sub update_version {
     my $archive = do {
         my $content = download $config{DOWNLOAD};
         
-        my $temp = File::Temp->new(UNLINK => 0);
+        my $temp = File::Temp->new(UNLINK => 0, suffix => $config{WINDOWS} ? '.zip' : '.tar.gz');
         print $temp $content;
         close($temp);
 
@@ -167,10 +168,10 @@ sub update_version {
     my $nimbus_exe = catfile($config{INSTALL}, 'nimbusapp');
 
     my @extract = $config{WINDOWS}
-            ? ('powershell', '-c', sprintf('Expand-Archive -Path "%s" -DestinationPath "%s"', $archive, $config{INSTALL}))
+            ?  quote_system('powershell', '-c', qq(Expand-Archive -Force -Path "$archive" -DestinationPath "$config{INSTALL}"))
             : ( (! -w $nimbus_exe ? 'sudo' : ()), 'tar', 'xzf', $archive, '-C', $config{INSTALL} );
 
-    debug("Running: ", @extract);
+    debug("Running: @extract");
     system(@extract);
 
     fatal "Failed to extract '$archive'. Status: $?" if $?;
@@ -178,7 +179,7 @@ sub update_version {
     unlink($archive) if -f $archive;
 
     my @version = ($nimbus_exe, '--version');
-    debug("Running: ", @version);
+    debug("Running: @version");
     system(@version);
 }
 
