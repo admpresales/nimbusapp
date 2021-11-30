@@ -90,7 +90,7 @@ $dispatch{$_} = \&docker_compose for qw( pull start stop restart rm ps logs exec
 # Output functions
 # Everything except docker-{compose,app} output goes to STDERR
 #    This allows that output to be easily recorded or used in scripts
-use subs qw(info debug warn error fatal usage);
+use subs qw(info debug warning error fatal usage);
 
 sub _log {
     return if $ENV{NIMBUS_INTERNAL};
@@ -105,7 +105,7 @@ sub _output { print STDERR @_, $config{NL} unless $ENV{NIMBUS_INTERNAL}; }
 
 sub debug   { _log 'DEBUG', @_; _output @_ if $config{DEBUG}; }
 sub info    { _log  'INFO', @_; _output @_ unless $config{QUIET}; }
-sub warn    { _log  'WARN', @_; _output text_block('LABEL_WARN'), @_; }
+sub warning { _log  'WARN', @_; _output text_block('LABEL_WARN'), @_; }
 sub error   { _log 'ERROR', @_; _output text_block('LABEL_ERROR'), @_; }
 sub fatal   { _log 'FATAL', @_; _output text_block('LABEL_ERROR'), @_; exit 1; }
 sub usage   { _log 'FATAL', @_; _output @_ ? (text_block('LABEL_ERROR'), @_, $config{NL}) : '', text_block('USAGE'); exit 1; }
@@ -278,7 +278,7 @@ sub docker_app($cmd, $params, $args) {
         if ($rc) {
             unlink($temp->filename);
             if ($params->{tag} =~ /^(.*?)_/) {
-                warn "Image name contains an underscore which is not used by nimbusapp. ",
+                warning "Image name contains an underscore which is not used by nimbusapp. ",
                       sprintf "Try using %s/%s:%s instead.", $params->{org}, $params->{image}, $1;
             }
             fatal "Could not render."
@@ -306,7 +306,7 @@ sub docker_compose($cmd, $params, $args) {
         }
         else {
             if ($!) {
-                debug "Error importing old config: $!";
+                warning "Error importing old config: $!";
             }
 
             my $rc = docker_app($cmd, $params, $args);
@@ -452,7 +452,7 @@ if ($config{WINDOWS}) {
             info text_block('DNS_COMPLETE', { servers => [ @dns ], file => $config{DAEMON_CONFIG} });
             restart_docker();
         } else {
-            warn text_block('MISSING_DNS', { file => $config{DAEMON_CONFIG} });
+            warning text_block('MISSING_DNS', { file => $config{DAEMON_CONFIG} });
         }
     }
 }
