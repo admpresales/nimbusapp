@@ -72,12 +72,12 @@ my %config = do {
 
 my %dispatch = (
     help => sub { usage(); },
-    version => sub {
-        info("Release Version: ", RELEASE_VERSION);
-        info("Release Date: ", RELEASE_DATE);
-        0;
+    version => \&display_version,
+    update => sub {
+        display_version(); 
+        prompt('CONFIRM_UPDATE');
+        update_version();
     },
-    update => \&update_version,
     up => prompt_first('CONFIRM_RECREATE', \&docker_app_compose),
     down => prompt_first('CONFIRM_DELETE', \&docker_compose),
     render => \&docker_app,
@@ -145,6 +145,12 @@ sub download($url, $context = 'Download error') {
     $res->{content};
 }
 
+sub display_version {
+    info("Release Version: ", RELEASE_VERSION);
+    info("Release Date: ", RELEASE_DATE);
+    0;
+}
+
 sub update_version {
     my $archive = do {
         my $content = download $config{DOWNLOAD};
@@ -158,23 +164,22 @@ sub update_version {
 
     debug("Temporary download location: ", $archive);
     debug("Extracting to: ", $config{INSTALL});
+    my $nimbus_exe = catfile($config{INSTALL}, 'nimbusapp');
 
-    my @extract = do {
-        if ($config{WINDOWS}) {
-            ('powershell', '-c', sprintf('Expand-Archive -Path "%s" -DestinationPath "%s"', $archive, $config{INSTALL}));
-        }
-        else {
-            my $dest = catfile($config{INSTALL}, 'nimbusapp');
-            ( (! -w $dest ? 'sudo' : ()), 'tar', 'xzf', $archive, '-C', $config{INSTALL});
-        }
-    };
+    my @extract = $config{WINDOWS}
+            ? ('powershell', '-c', sprintf('Expand-Archive -Path "%s" -DestinationPath "%s"', $archive, $config{INSTALL}))
+            : ( (! -w $nimbus_exe ? 'sudo' : ()), 'tar', 'xzf', $archive, '-C', $config{INSTALL} );
 
     debug("Running: ", @extract);
     system(@extract);
 
     fatal "Failed to extract '$archive'. Status: $?" if $?;
 
-    unlink($archive) if -f $archive
+    unlink($archive) if -f $archive;
+
+    my @version = ($nimbus_exe, '--version');
+    debug("Running: ", @version);
+    system(@version);
 }
 
 sub prompt($label, $params = {}) {
@@ -574,6 +579,8 @@ nimbusapp [% originalImage %]:<version_number> [% cmd %]
 
 The version number you choose will be remembered for future commands.
 },
+
+CONFIRM_UPDATE => '[% red %]Do you want to update your nimbusapp version?[% reset %]',
 
 CONFIRM_DELETE => q{
 [% bold %]This action will [% red %]DELETED[% reset %][% bold %] your containers and is [% red %]IRREVERSIBLE[% reset %]!
