@@ -9,6 +9,9 @@ use File::Copy qw(copy);
 use Time::Piece;
 
 use App::FatPacker;
+use Archive::Tar;
+use IO::Compress::Zip qw(zip $ZipError);
+
 # Clean up after previous build
 remove_tree('build');
 make_path('build');
@@ -106,22 +109,24 @@ print "\nBuild Complete:\n";
 system("$^X ./nimbusapp.packed.pl version");
 print "\n";
 
-make_path('win32');
-copy('nimbusapp.packed.pl', 'win32/nimbusapp.pl');
-copy('../nimbusapp.bat', 'win32');
-
 make_path('linux');
 copy('nimbusapp.packed.pl', 'linux/nimbusapp');
 chdir('linux');
-chmod 0755, 'nimbusapp';
-system(qw(tar cvzf nimbusapp.tar.gz nimbusapp)) == 0 or die "Creating tar.gz file failed ($?)";
+
+my $tar = Archive::Tar->new();
+$tar->add_files('nimbusapp');
+$tar->chmod('nimbusapp', 755);
+$tar->write('nimbusapp.tar.gz', COMPRESS_GZIP);
+
 chdir('..');
 
 make_path('win32');
 copy('nimbusapp.packed.pl', 'win32/nimbusapp.pl');
 copy('../nimbusapp.bat', 'win32');
 chdir('win32');
-system(qw(zip nimbusapp.zip nimbusapp.bat nimbusapp.pl)) == 0 or die "Creating zip file failed ($?)";
+
+zip [qw(nimbusapp.bat nimbusapp.pl)] => 'nimbusapp.zip' or die $ZipError;
+
 chdir('..');
 
 print "\nPackaging Complete.\n";
