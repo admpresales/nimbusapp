@@ -8,6 +8,7 @@ use File::Spec::Functions qw(catfile);
 use File::Copy qw(copy);
 use Time::Piece;
 
+use App::FatPacker;
 # Clean up after previous build
 remove_tree('build');
 make_path('build');
@@ -19,10 +20,11 @@ my %buildInfo = (
 );
 
 {
-    open my $in, '<', 'nimbusapp.pl';
-    open my $out, '>', 'build/nimbusapp.pl';
+    open my $in, '<:raw', 'nimbusapp.pl';
+    open my $out, '>:raw', 'build/nimbusapp.pl';
 
     while (<$in>) {
+        die "Input file contains carriage return at line $." if /\r/;
         s/CHANGEME_(\w+)/$buildInfo{$1}/eg;
         print $out $_;
     }
@@ -60,8 +62,8 @@ for my $module (@modules) {
     chomp $srcPath;
 
     make_path($destDir);
-    open my $in, '<', $srcPath or die "Can't open $srcPath: $!";
-    open my $out, '>', $destPath or die "Can't open $destPath: $!";
+    open my $in, '<:raw', $srcPath or die "Can't open $srcPath: $!";
+    open my $out, '>:raw', $destPath or die "Can't open $destPath: $!";
 
     my $inPod = 0;
     my $blank = 0;
@@ -93,7 +95,12 @@ for my $module (@modules) {
 }
 
 # Build and pack final artifacts
-system('fatpack file nimbusapp.pl > nimbusapp.packed.pl');
+{
+    # system('fatpack file nimbusapp.pl > nimbusapp.packed.pl');
+    my $packed = App::FatPacker->new->fatpack_file('nimbusapp.pl');
+    open my $out, '>:raw', 'nimbusapp.packed.pl';
+    print $out $packed;
+}
 
 print "\nBuild Complete:\n";
 system("$^X ./nimbusapp.packed.pl version");
