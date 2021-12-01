@@ -42,7 +42,7 @@ my @modules = ();
     open my $fh, '<', 'cpanfile' or die $!;
 
     while (<$fh>) {
-        /^\s*requires\s*(['"])(.+?)\g1\s*;\s*$/ or next;
+        /^\s*requires\s*(['"])(.+?)\g1/ or next;
         push @modules, $2;
     }
 
@@ -85,7 +85,6 @@ for my $module (@modules) {
                 next;
             }
         }
-        
 
         $size += length $out;
         print $out $_;
