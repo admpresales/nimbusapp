@@ -13,7 +13,9 @@ use Archive::Tar;
 use IO::Compress::Zip qw(zip $ZipError);
 
 # Clean up after previous build
-remove_tree('build');
+remove_tree('build', { error => \my $error });
+die join "\n", map { join " => ", %$_ } @$error if @$error;
+
 make_path('build');
 
 # Pre-process nimbusapp.pl
