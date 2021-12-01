@@ -113,6 +113,7 @@ print "\n";
 make_path('linux');
 copy('nimbusapp.packed.pl', 'linux/nimbusapp');
 chdir('linux');
+chmod(0755, 'nimbusapp');
 
 my $tar = Archive::Tar->new();
 $tar->add_files('nimbusapp');
