@@ -71,7 +71,6 @@ for my $module (@modules) {
     open my $out, '>:raw', $destPath or die "Can't open $destPath: $!";
 
     my $inPod = 0;
-    my $blank = 0;
     my $size = 0;
 
     while (<$in>) {
@@ -88,7 +87,7 @@ for my $module (@modules) {
             }
         }
 
-        $size += length $out;
+        $size += length;
         print $out $_;
     }
 
@@ -110,25 +109,14 @@ print "\nBuild Complete:\n";
 system("$^X ./nimbusapp.packed.pl version");
 print "\n";
 
-make_path('linux');
-copy('nimbusapp.packed.pl', 'linux/nimbusapp');
-chdir('linux');
-chmod(0755, 'nimbusapp');
-
 my $tar = Archive::Tar->new();
-$tar->add_files('nimbusapp');
+$tar->add_files('nimbusapp.packed.pl');
+$tar->rename('nimbusapp.packed.pl', 'nimbusapp');
 $tar->chmod('nimbusapp', 755);
 $tar->write('nimbusapp.tar.gz', COMPRESS_GZIP);
 
-chdir('..');
-
-make_path('win32');
-copy('nimbusapp.packed.pl', 'win32/nimbusapp.pl');
-copy('../nimbusapp.bat', 'win32');
-chdir('win32');
-
-zip [qw(nimbusapp.bat nimbusapp.pl)] => 'nimbusapp.zip' or die $ZipError;
-
-chdir('..');
+zip [qw(../nimbusapp.bat nimbusapp.packed.pl)] => 'nimbusapp.zip',
+    FilterName => sub { s!../!!; s!.packed!! }
+    or die $ZipError;
 
 print "\nPackaging Complete.\n";

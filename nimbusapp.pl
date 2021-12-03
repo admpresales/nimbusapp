@@ -169,7 +169,7 @@ sub update_version {
 
     my @extract = $config{WINDOWS}
             ?  quote_system('powershell', '-c', qq(Expand-Archive -Force -Path "$archive" -DestinationPath "$config{INSTALL}"))
-            : ( (! -w $nimbus_exe ? 'sudo' : ()), 'tar', 'xzf', $archive, '-C', $config{INSTALL} );
+            : ( (! -w $nimbus_exe || ! -w $config{INSTALL} ? 'sudo' : ()), 'tar', 'xzf', $archive, '--no-same-owner', '-C', $config{INSTALL} );
 
     debug("Running: @extract");
     system(@extract);
