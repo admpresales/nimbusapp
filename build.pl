@@ -105,7 +105,7 @@ for my $module (@modules) {
     print $out $packed;
 }
 
-chmod 0755 'nimbusapp.packed.pl';
+chmod 0755, 'nimbusapp.packed.pl';
 
 print "\nBuild Complete:\n";
 system("$^X ./nimbusapp.packed.pl version");
