@@ -115,8 +115,13 @@ $tar->rename('nimbusapp.packed.pl', 'nimbusapp');
 $tar->chmod('nimbusapp', 755);
 $tar->write('nimbusapp.tar.gz', COMPRESS_GZIP);
 
-zip [qw(../nimbusapp.bat nimbusapp.packed.pl)] => 'nimbusapp.zip',
-    FilterName => sub { s!../!!; s!.packed!! }
+my %zipFiles = (
+    '../nimbusapp.bat' => 'nimbusapp.bat',
+    'nimbusapp.packed.pl' => 'nimbusapp.pl'
+);
+
+zip [ keys %zipFiles ] => 'nimbusapp.zip',
+    FilterName => sub { $_ = $zipFiles{$_} }
     or die $ZipError;
 
 print "\nPackaging Complete.\n";
