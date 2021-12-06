@@ -88,7 +88,7 @@ pipeline {
                     docker version
                     docker-compose version
                     docker-app version
-                    ./build/linux/nimbusapp version
+                    ./build/nimbusapp.packed.pl version
                 ) 2>&1 | tee test-versions.txt
                 '''
             }
@@ -101,7 +101,7 @@ pipeline {
                         set -xe
 
                         export PATH="$PWD/bats-core/bin:$PWD/bats-core/libexec/bats-core:$PATH"
-                        export NIMBUS_EXE="./build/linux/nimbusapp"
+                        export NIMBUS_EXE="./build/nimbusapp.packed.pl"
                         export PERLBREW_ROOT=/opt/perl5
 
                         /opt/perl5/bin/perlbrew exec --with 5.20.3 bats tests --tap | tee bats-tap.log
@@ -117,7 +117,7 @@ pipeline {
 
         stage('Archive') {
             steps {
-                archiveArtifacts artifacts: 'build/linux/nimbusapp.tar.gz,build/win32/nimbusapp.zip,bats-tap.log,test-versions.txt'
+                archiveArtifacts artifacts: 'build/nimbusapp.tar.gz,build/nimbusapp.zip,bats-tap.log,test-versions.txt'
             }
         } // Archive
     } // stages
