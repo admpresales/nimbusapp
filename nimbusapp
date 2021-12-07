@@ -88,7 +88,7 @@ function get_tags() {
     tag_filter_command='head -n 1'
   fi
   #This string will get all non-dev versions from docker hub, in last updated order.
-  results="$(curl -s -o -w %{http_code} https://hub.docker.com/v2/repositories/admpresales/${IMAGE}.dockerapp/tags?ordering=last_updated | jq -r .results[].name | grep -v dev | ${tag_filter_command})"
+  results="$(curl -s https://hub.docker.com/v2/repositories/admpresales/${IMAGE}.dockerapp/tags | jq -r .results[].name | grep -v dev | sort -rV | ${tag_filter_command})"
 
   printf '%s\n' $results
 }
@@ -231,13 +231,13 @@ prompt_delete() {
 
 prompt_recreate() {
     output  "" \
-            "${C_BOLD}This action will cause one or more of your containers to be ${C_RED}DELETED${C_REG} and ${C_RED}RECREATED${C_REG}.${C_RESET}" \
+            "${C_BOLD}This action may cause one or more of your containers to be ${C_RED}DELETED${C_REG} and ${C_RED}RECREATED${C_REG}.${C_RESET}" \
             "" \
             "${C_BOLD}Recreating containers is normal when changing their configuration, such as image, tag and ports.${C_RESET}" \
             "" \
             "${C_BOLD}You may wish to use ${C_RESET}\`nimbusapp ${REPOSITORY}/${IMAGE}:${VERSION} start'${C_BOLD} to start your existing containers.${C_RESET}" \
             "" \
-            "${C_BOLD}The following containers will be recreated:${C_RESET}"
+            "${C_BOLD}The following containers may be recreated:${C_RESET}"
 
     for c in "$@"; do
         output "- $c"
@@ -255,18 +255,8 @@ check_recreate() {
     local containers=($(docker-compose -p "$PROJECT" -f "$COMPOSE_FILE" ps -q))
     local recreate=()
 
-    local service hash composeHash name
-
     for id in "${containers[@]}"; do
-        service="$(docker inspect "$id" --format '{{index .Config.Labels "com.docker.compose.service"}}')"
-        hash="$(docker inspect "$id" --format '{{index .Config.Labels "com.docker.compose.config-hash"}}')"
-        
-        composeHash="$(docker-compose -p "$PROJECT" -f "$COMPOSE_FILE" config --hash="$service")"
-
-        if [[ "$service $hash" != "$composeHash" ]]; then
-            name="$(docker inspect "$id" --format {{.Name}})"
-            recreate+=("$name")
-        fi
+        recreate+=("$(docker inspect "$id" --format {{.Name}})")
     done
 
     if [[ ${#recreate[@]} -gt 0 ]]; then
