@@ -43,8 +43,8 @@ Extract the downloaded file to /usr/local/bin:
 
 ```ps1
 Compress-Archive -Path 'C:\Program Files\Docker\nimbusapp*' -DestinationPath C:\Users\demo\Desktop\nimbusapp-backup.zip
-Invoke-WebRequest https://github.com/admpresales/nimbusapp/releases/latest/download/nimbusapp.zip -OutFile nimbusapp.zip
-Expand-Archive -Path .\Desktop\nimbusapp.zip -DestinationPath 'C:\Program Files\Docker' -Force
+Invoke-WebRequest https://github.com/admpresales/nimbusapp/releases/latest/download/nimbusapp.zip -OutFile C:\temp\nimbusapp.zip
+Expand-Archive -Path C:\temp\nimbusapp.zip -DestinationPath 'C:\Program Files\Docker' -Force
 ```
 
 ### Manual Install
