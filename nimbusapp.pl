@@ -271,7 +271,7 @@ sub docker_app($cmd, $params, $args) {
         my $temp = File::Temp->new(UNLINK => 0);
 
         my @command = ('docker-app', 'render', @settings, $params->{fullImage});
-        @command = quote_system @command if $config{WINDOWS};
+        @command = quote_system(@command) if $config{WINDOWS};
         debug("Running: ", join ' ', @command);
         open(my $app, '-|', @command) or fatal "Could not run docker-app: $! ($?)";
 
@@ -341,7 +341,7 @@ sub docker_compose($cmd, $params, $args) {
     }
 
     my @compose = ( 'docker-compose', '-f', $params->{composeFile}, '-p', $params->{project}, $cmd, @$args );
-    @compose = quote_system @compose if $config{WINDOWS};
+    @compose = quote_system(@compose) if $config{WINDOWS};
     debug("Running: ", join ' ', @compose);
     system @compose;
 
