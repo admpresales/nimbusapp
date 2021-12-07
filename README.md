@@ -1,13 +1,22 @@
 # nimbusapp
+
 Script to make starting demo containers easier.
 
 This script is based on the images in https://hub.docker.com/u/admpresales
 
-## Installation
+## Installation - Prerequisites
+
+Starting with version 1.6.0, nimbusapp requires the following:
+
+* Perl v5.20 or higher
+  * If your system perl is lacking, try [Perlbrew](https://perlbrew.pl/) on Linux or [Strawberry Perl](https://strawberryperl.com/) on Windows.
+* For SSL support (`tags` and `update` commands), the IO::Socket::SSL and Net::SSLeay modules are required. (Needs C compiler and OpenSSL on Linux)
+
+## Installation - Linux
 
 ### Quick Install
 
-```
+```sh
 wget -nv https://github.com/admpresales/nimbusapp/releases/latest/download/nimbusapp.tar.gz -O- | sudo tar -xz -C /usr/local/bin
 ```
 
@@ -15,7 +24,7 @@ wget -nv https://github.com/admpresales/nimbusapp/releases/latest/download/nimbu
 
 Download the latest .tar.gz release from https://github.com/admpresales/nimbusapp/releases by executing the following commands from a terminal window:
 
-```
+```sh
 [demo@nimbusserver ~]$ cd ~/Downloads
 [demo@nimbusserver ~]$ rm -f nimbusapp.tar.gz*
 [demo@nimbusserver Downloads]$ wget -nv https://github.com/admpresales/nimbusapp/releases/latest/download/nimbusapp.tar.gz
@@ -28,7 +37,23 @@ Extract the downloaded file to /usr/local/bin:
 [demo@nimbusserver Downloads]$ sudo tar -xzf nimbusapp.tar.gz -C /usr/local/bin
 ```
 
-### Verify
+## Installation - Windows
+
+### Quick Install
+
+```ps1
+Compress-Archive -Path 'C:\Program Files\Docker\nimbusapp*' -DestinationPath C:\Users\demo\Desktop\nimbusapp-backup.zip
+Invoke-WebRequest https://github.com/admpresales/nimbusapp/releases/latest/download/nimbusapp.zip -OutFile nimbusapp.zip
+Expand-Archive -Path .\Desktop\nimbusapp.zip -DestinationPath 'C:\Program Files\Docker' -Force
+```
+
+### Manual Install
+
+Download the latest .zip release from https://github.com/admpresales/nimbusapp/releases.
+
+Extract the downloaded .zip file into a location on your system's %PATH%. A convenient location is "C:\Program Files\Docker".
+
+## Verify
 
 To verify your installation, run the `nimbusapp version` command and compare the reported version to the release you intended to install:
 
@@ -58,14 +83,13 @@ You may need to remove or rename extra copies of the script until the correct sc
 ## Using Nimbusapp
 
 This section provides basic usage instructions.
+
 Please refer to the individual dockerapp entries on [ADM Presales Docker Hub](https://hub.docker.com/u/admpresales)
 for image specific instructions.
 
 Examples use the [Nimbusapp Test Image](./tests/nimbusapp-test.dockerapp), which starts a single container with a lightweight web server.
 
 See the [Usage Text](./USAGE.txt) or `nimbusapp help` for more information.
-
-Please refer to the individual images on [ADM Presales Docker Hub](https://hub.docker.com/u/admpresales) for image-specific instructions and examples.
 
 ### Gerneral Format
 
