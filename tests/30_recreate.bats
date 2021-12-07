@@ -53,24 +53,26 @@ function assert_message() {
     (( status == 0 ))
 
     assert_output_contains "The following containers may be recreated:"
-    assert_output_contains "- /nimbusapp-test-web" 
-    assert_output_contains "Recreate the listed containers? \[y/n\]"
+    assert_output_contains "- web" 
+    assert_output_contains "Some or all containers may be recreated, do you wish to continue? \[y/N\]"
     assert_output_contains "Recreating nimbusapp-test-web ... done"
 
+    # If the message is set to "true", there may be an issue with yaml parsing the message value
     assert_message "yes"
 }
 
 @test "Recreate: No" {
     run "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=no" -d up <<< $'n\n'
 
-    (( status == 1 ))
+    (( status == 0 ))
     
     assert_output_contains "The following containers may be recreated:"
-    assert_output_contains "- /nimbusapp-test-web" 
-    assert_output_contains "Recreate the listed containers? \[y/n\]"
+    assert_output_contains "- web" 
+    assert_output_contains "Some or all containers may be recreated, do you wish to continue? \[y/N\]"
 
     assert_not_output_contains "Recreating nimbusapp-test-web ... done"
 
+    # If the message is set to "true", there may be an issue with yaml parsing the message value
     assert_message "yes" # Should not have changed
 }
 
@@ -79,8 +81,9 @@ function assert_message() {
 
     (( stauts == 0 ))
 
-    assert_not_output_contains "The following containers may be recreated:"
-    assert_not_output_contains "- /nimbusapp-test-web" 
+    assert_not_output_contains "The following containers will be recreated:"
+    assert_not_output_contains "- web" 
+
     assert_not_output_contains "Recreate the listed containers? \[y/n\]"
 
     assert_output_contains "Recreating nimbusapp-test-web ... done"

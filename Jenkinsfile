@@ -1,3 +1,5 @@
+@Library("nimbus-pipeline-library") _
+
 pipeline {
     agent { label 'linux' }
 
@@ -19,11 +21,7 @@ pipeline {
         stage('Notify Start') {
             steps {
                 script {
-                    slackSend(
-                        channel: 'nimbus',
-                        message: "${env.JOB_NAME} - ${currentBuild.displayName} ${currentBuild.buildCauses[0].shortDescription} (<${env.JOB_URL}|Open>)",
-                        color: (currentBuild.previousBuild?.result == 'SUCCESS') ? 'good' : 'danger'
-                    )
+                    notifyStart()
                 }
             }
         }
@@ -52,10 +50,10 @@ pipeline {
                     // Assumptions:
                     //  - Github and Docker Hub organizations match
                     //  - Job is in root folder of this instance
-                    pushOpts = $/--namespace "${env.JOB_NAME.split('/')[0]}"/$
+                    pushOpts = """ --namespace "${env.JOB_NAME.split('/')[0]}" """
 
                     if (params.DOCKERAPP_FORCE_PUSH && params.DOCKERAPP_TAG) {
-                        pushOpts += $/ --tag "${params.DOCKERAPP_TAG}"/$
+                        pushOpts += """ --tag "${params.DOCKERAPP_TAG}" """
                     }
                 }
 
@@ -70,13 +68,10 @@ pipeline {
 
         stage('Build') {
             steps {
-                script {
-                    releaseDate = new Date().format('YYYY-MM-dd')
-                }
-
                 sh """
-                    sed -i -e 's#\\(readonly NIMBUS_RELEASE_VERSION=\\).*#\\1"${env.BRANCH_NAME}"#' \\
-                           -e 's#\\(readonly NIMBUS_RELEASE_DATE=\\).*#\\1"${releaseDate}"#' nimbusapp
+                set -xe
+                docker build . -t nimbusapp-builder:${env.BRANCH_NAME}
+                docker run --rm -v "\$PWD:/app" -w /app nimbusapp-builder:${env.BRANCH_NAME} perl build.pl ${env.BRANCH_NAME}
                 """
             }
         }
@@ -88,11 +83,12 @@ pipeline {
                 }
                 sh '''
                 (
-                    set -x
+                    set -xe
+                    perl -V
                     docker version
                     docker-compose version
                     docker-app version
-                    ./nimbusapp version
+                    ./build/nimbusapp.packed.pl version
                 ) 2>&1 | tee test-versions.txt
                 '''
             }
@@ -102,8 +98,13 @@ pipeline {
             steps {
                 lock('nimbusapp-test') {
                     sh '''
+                        set -xe
+
                         export PATH="$PWD/bats-core/bin:$PWD/bats-core/libexec/bats-core:$PATH"
-                        bats tests --tap | tee bats-tap.log
+                        export NIMBUS_EXE="./build/nimbusapp.packed.pl"
+                        export PERLBREW_ROOT=/opt/perl5
+
+                        /opt/perl5/bin/perlbrew exec --with 5.20.3 bats tests --tap | tee bats-tap.log
                     '''
                 }
             }
@@ -116,20 +117,13 @@ pipeline {
 
         stage('Archive') {
             steps {
-                sh '''
-                tar -czvf nimbusapp.tar.gz nimbusapp
-                '''
-                archiveArtifacts artifacts: 'nimbusapp,nimbusapp.tar.gz,bats-tap.log,test-versions.txt'
+                archiveArtifacts artifacts: 'build/nimbusapp.tar.gz,build/nimbusapp.zip,bats-tap.log,test-versions.txt'
             }
         } // Archive
     } // stages
     post {
         always {
-            slackSend(
-                channel: 'nimbus',
-                message: "${env.JOB_NAME} - ${currentBuild.displayName} *${currentBuild.currentResult}* in ${currentBuild.durationString.replaceAll(' and counting', '')}" + ((currentBuild.currentResult != 'SUCCESS') ? " (<${env.BUILD_URL}console|Console>)" : ''),
-                color: (currentBuild.currentResult == 'SUCCESS') ? 'good' : 'danger'
-            )
+            notifyComplete()
         }
     } // post
 } // pipeline
