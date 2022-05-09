@@ -8,6 +8,9 @@ This script is based on the images in https://hub.docker.com/u/admpresales
 
 Starting with version 1.6.0, nimbusapp requires the following:
 
+* [Docker](https://docs.docker.com/engine/install/)
+* [Docker Compose 1.27+](https://docs.docker.com/compose/install/)
+* [Docker App 0.6.0](https://github.com/docker/app/releases/tag/v0.6.0)
 * Perl v5.20 or higher
   * If your system perl is lacking, try [Perlbrew](https://perlbrew.pl/) on Linux or [Strawberry Perl](https://strawberryperl.com/) on Windows.
 * For SSL support (`tags` and `update` commands), the IO::Socket::SSL and Net::SSLeay modules are required. (Needs C compiler and OpenSSL on Linux)
@@ -43,8 +46,8 @@ Extract the downloaded file to /usr/local/bin:
 
 ```ps1
 Compress-Archive -Path 'C:\Program Files\Docker\nimbusapp*' -DestinationPath C:\Users\demo\Desktop\nimbusapp-backup.zip
-Invoke-WebRequest https://github.com/admpresales/nimbusapp/releases/latest/download/nimbusapp.zip -OutFile nimbusapp.zip
-Expand-Archive -Path .\Desktop\nimbusapp.zip -DestinationPath 'C:\Program Files\Docker' -Force
+Invoke-WebRequest https://github.com/admpresales/nimbusapp/releases/latest/download/nimbusapp.zip -OutFile C:\temp\nimbusapp.zip
+Expand-Archive -Path C:\temp\nimbusapp.zip -DestinationPath 'C:\Program Files\Docker' -Force
 ```
 
 ### Manual Install
