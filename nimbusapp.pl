@@ -586,9 +586,9 @@ The version number you choose will be remembered for future commands.
 CONFIRM_UPDATE => '[% red %]Do you want to update your nimbusapp version?[% reset %]',
 
 CONFIRM_DELETE => q{
-[% bold %]This action will [% red %]DELETED[% reset %][% bold %] your containers and is [% red %]IRREVERSIBLE[% reset %]!
+[% bold %]This action will [% red %]DELETE[% reset %][% bold %] your containers and is [% red %]IRREVERSIBLE[% reset %]!
 
-[% bold %]You may wish to use [% reset %]`nimbusapp [% originalImage %] stop'[% bold %] to shut down your containers without deleting them[% reset %]
+[% bold %]You may wish to use [% reset %]`nimbusapp [% originalImage %] stop'[% bold %] to shut down your containers without deleting them.[% reset %]
     
 [% bold %]The following containers will be deleted:[% reset %]
 [% FOREACH item IN containers -%]
