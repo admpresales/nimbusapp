@@ -76,6 +76,10 @@ my %dispatch = (
     down => prompt_first('CONFIRM_DELETE', \&docker_compose),
     render => \&docker_app,
     inspect => \&docker_app,
+    tags => sub {
+        print join $config{NL}, list_tags(@_);
+        print $config{NL};
+    },
     tags => \&list_tags
 );
 
@@ -353,7 +357,7 @@ sub list_tags($, $params, $) {
 
     my $data = decode_json(download $url)->{results};
 
-    print "$_", $config{NL} for
+    return
         grep { $n-- > 0 }
         sort { versioncmp($b, $a) }
         map { $_->{name} }
