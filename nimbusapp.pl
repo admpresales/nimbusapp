@@ -80,7 +80,9 @@ my %dispatch = (
         print join $config{NL}, list_tags(@_);
         print $config{NL};
     },
-    tags => \&list_tags
+    cache => sub($cmd, $params, $args) {
+        print $params->{tag}, $config{NL};
+    }
 );
 
 $dispatch{$_} = \&docker_compose for qw( pull start stop restart rm ps logs exec );
