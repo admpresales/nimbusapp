@@ -24,14 +24,7 @@ use Term::ANSIColor;
 use if $^O eq 'MSWin32',   'Win32::Console::ANSI';
 use if $^O eq 'MSWin32', qw'Win32::ShellQuote quote_system';
 
-no if $] < 5.024, qw( warnings experimental::postderef );
-use feature 'postderef';
-
-no if $] < 5.026, qw( warnings experimental::lexical_subs );
-use feature 'lexical_subs';
-
-no warnings 'experimental::signatures';
-use feature 'signatures';
+use experimental qw(postderef lexical_subs signatures);
 
 use constant {
     RELEASE_VERSION => "CHANGEME_RELEASE",
