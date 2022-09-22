@@ -465,7 +465,8 @@ if ($config{WINDOWS}) {
 }
 
 my $image_re = qr{
-    ^(?:  (?<org>   [a-z0-9]{4,30}  ) \/ )?             # Optional org  (lowercase + numbers)
+    ^(?<originalImage>
+          (?<org>   [a-z0-9]{4,30}  ) \/ )?             # Optional org  (lowercase + numbers)
           (?<image> [a-z0-9][a-z0-9_.-]+ )              # Image         (lowercase + numbers + limited special)
      (?: :(?<tag>   [a-zA-Z0-9][a-zA-Z0-9_.-]+ ) )? $   # Optional tag  (lower/upper + numbers + limited special)
 }xx;
@@ -541,12 +542,17 @@ if (!defined $command) {
 elsif (!defined $dispatch{$command}) {
     usage "Unknown command: $command";
 }
-elsif ($command ne 'tags') {
-    fatal text_block('MISSING_VERSION', \%params) if not defined $params{tag};
+elsif (!defined($params{tag}) && $command ne 'tags') {
+    if (defined $params{latest} && $params{latest}) {
+        ($params{tag}) = list_tags(undef, \%params, undef);
+    }
+    else {
+        fatal text_block('MISSING_VERSION', \%params);
+    }
+}
 
     $params{fullImage} = sprintf "%s/%s.dockerapp:%s", @params{qw(org image tag)};
-    info 'Using: ', $params{fullImage};
-}
+info 'Using: ', $params{fullImage} unless $command eq 'tags';
 
 my $rc = $dispatch{$command}->($command, \%params, \@ARGV);
 save_app_config(%params) if $rc == 0;
