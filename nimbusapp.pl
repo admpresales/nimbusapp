@@ -55,12 +55,13 @@ my %config = do {
         QUIET => $ENV{NIMBUS_QUIET} // 0,     # Be quiet
         DAEMON_CONFIG => $isWin32 ? 'C:\ProgramData\Docker\config\daemon.json' : '/etc/docker/daemon.json',
         LOG_FILE => $ENV{NIMBUS_LOG} // catfile($nimbusHome, 'nimbusapp.log'),
-        INSTALL => $ENV{NIMBUS_INSTALL_DIR} // dirname($0),
+        INSTALL  => $ENV{NIMBUS_INSTALL_DIR} // dirname($0),
         DOWNLOAD => $ENV{NIMBUS_DOWNLOAD_URL} // 'https://github.com/admpresales/nimbusapp/releases/latest/download/nimbusapp' . ($isWin32 ? '.zip' : '.tar.gz'),
         HUB_API_BASE => $ENV{NIMBUS_HUB_API_BASE} // "https://hub.docker.com/v2",
         INTELLIJ_MOUNT_HOME => $ENV{NIMBUS_INTELLIJ_HOME} // catfile( $userHome, 'IdeaProjects_docker' ),
         INTELLIJ_MOUNT_M2   => $ENV{NIMBUS_INTELLIJ_MAVEN} // catfile( $userHome, '.m2' ),
-        NL => $isWin32 ? "\r\n" : "\n"
+        NL => $isWin32 ? "\r\n" : "\n",
+        SAVE_APPS_CONFIG => $ENV{NIMBUS_SAVE_CONFIG} // 1,
     );
 };
 
@@ -82,7 +83,8 @@ my %dispatch = (
     },
     cache => sub($cmd, $params, $args) {
         print $params->{tag}, $config{NL};
-    }
+    },
+    delete => \&delete_image,
 );
 
 $dispatch{$_} = \&docker_compose for qw( pull start stop restart rm ps logs exec );
@@ -347,6 +349,37 @@ sub docker_compose($cmd, $params, $args) {
     return 0;
 }
 
+sub delete_image($cmd, $params, $args) {
+    $config{SAVE_APPS_CONFIG} = 0;
+    $params->{composeFile} = catfile( dirname( $params->{composeFile} ), 'delete.yml');
+
+    docker_app($cmd, $params, $args);
+
+    my $compose = YAML::Tiny->read( $params->{composeFile} );
+
+    my @images = 
+        grep { qx(docker images -q $_) }
+        # grep { $_ =~ /^admpresales/ }
+        map { say $_->{image}; $_->{image} }
+        values $compose->[0]{services}->%*;
+
+    unless (@images) {
+        info "No images found.";
+        return 0;
+    }
+
+    local $params->{images} = [ @images ];
+    prompt('CONFIRM_IMAGE_DELETE', $params);
+
+    my @command = ('docker', 'rmi', @images);
+    @command = quote_system(@command) if $config{WINDOWS};
+    
+    debug("Running: ", join(@command));
+    system(@command);
+    
+    return $?;
+}
+
 sub docker_app_compose {
     my $rc = docker_app(@_);
     return $rc if $rc;
@@ -525,8 +558,6 @@ if (not defined $params{project}) {
     $params{project} = $params{image};
 }
 
-$params{originalImage} = $params{image};
-
 %params = load_app_config(%params);
 
 usage("No image found.") if not defined $params{image};
@@ -552,12 +583,11 @@ elsif (!defined($params{tag}) && $command ne 'tags') {
 }
 
     $params{fullImage} = sprintf "%s/%s.dockerapp:%s", @params{qw(org image tag)};
-info 'Using: ', $params{fullImage} unless $command eq 'tags';
+info 'Using: ', $params{fullImage} unless $command eq 'tags' || $command eq 'render';
 
 my $rc = $dispatch{$command}->($command, \%params, \@ARGV);
-save_app_config(%params) if $rc == 0;
+save_app_config(%params) if $config{SAVE_APPS_CONFIG} && $rc == 0;
 exit $rc;
-
 
 sub load_text {
 return {
@@ -616,6 +646,19 @@ CONFIRM_RECREATE => q{
 [% END -%]
 
 [% red %]Some or all containers may be recreated, do you wish to continue?[% reset %]
+},
+
+CONFIRM_IMAGE_DELETE => q{
+[% bold %]This action will attempt to [% red %]DELETE[% reset %][% bold %] your images and is [% red %]IRREVERSIBLE[% reset %]!
+
+[% bold %]Any images that are currently in use will not be deleted, use [% reset %]`nimbusapp <image> down`[% bold %] to delete containers before removing images.[% reset %]
+
+[% bold %]The following images will be deleted:[% reset %]
+[% FOREACH img IN images -%]
+    - [% img %]
+[% END -%]
+
+[% red %]Do you wish to DELETE these images?[% reset %]
 },
 
 USAGE => q{
