@@ -85,3 +85,39 @@ function assert_not_container_exists() {
         return 0
     fi
 }
+
+# assert_image_exists()
+#
+# Assert that the named image exists
+#
+function assert_image_exists() {
+    local image silent=0
+
+    if [[ "$1" == "--silent" ]]; then
+        silent=1
+        shift
+    fi
+
+    image="$1"
+
+    if grep -q "${image}" < <(docker images --format "{{.Repository}}:{{.Tag}}"); then
+        return 0
+    else
+        # (( silent == 0 )) && echo "FAIL: assert_container_exists $1" >&2
+        (( silent == 0 )) && echo "FAIL: assert_image_exists $iamge" >&2
+        return 1
+    fi
+}
+
+# assert_not_image_exists()
+#
+# Assert that the named image does not exist
+#
+function assert_not_image_exists() {
+    if assert_image_exists --silent "$1" 2>/dev/null; then
+        echo "FAIL: assert_not_image_exists $1" >&2
+        return 1
+    else
+        return 0
+    fi
+}
