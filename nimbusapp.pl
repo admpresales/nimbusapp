@@ -85,9 +85,12 @@ my %dispatch = (
         print $params->{tag}, $config{NL};
     },
     delete => \&delete_image,
+    purge => \&purge_images,
 );
 
-$dispatch{$_} = \&docker_compose for qw( pull start stop restart rm ps logs exec );
+# Compose pass-through
+$dispatch{$_} = \&docker_compose for qw( pull start stop restart rm ps logs exec kill port events run top );
+
 
 # Output functions
 # Everything except docker-{compose,app} output goes to STDERR
@@ -134,6 +137,20 @@ sub text_block($name, $params = {}) {
     $template->process(\$text->{$name}, $params, \my $output) || die sprintf "Template error (%s): %s\n", $name, $template->error;
 
     return $output;
+}
+
+sub run_command(@cmd) {
+    @cmd = quote_system(@cmd) if $config{WINDOWS};
+    debug("Running: @cmd");
+    open(my $fh, '-|', @cmd) or die "Could not run $cmd[0]: $!\n";
+    if (wantarray) {
+        chomp(my @out = <$fh>);
+        return @out;
+    }
+    else {
+        local $/;
+        return <$fh>;
+    }
 }
 
 sub download($url, $context = 'Download error') {
@@ -359,8 +376,7 @@ sub delete_image($cmd, $params, $args) {
 
     my @images = 
         grep { qx(docker images -q $_) }
-        # grep { $_ =~ /^admpresales/ }
-        map { say $_->{image}; $_->{image} }
+        map { $_->{image} }
         values $compose->[0]{services}->%*;
 
     unless (@images) {
@@ -378,6 +394,40 @@ sub delete_image($cmd, $params, $args) {
     system(@command);
     
     return $?;
+}
+
+sub purge_images($cmd, $params, $args) {
+    state sub split_image($i) { $i =~ qr/(.*?):(.*$)/ };
+
+    my $compose = YAML::Tiny->read( $params->{composeFile} );
+    my @images = map { $_->{image} } values $compose->[0]{services}->%*;
+
+    my %keep = ();
+    my @all = ();
+
+    for my $image (@images) {
+        my ($base, $tag) = split_image $image;
+
+        if (not defined $keep{$base}) {
+            my @ids = run_command(qw(docker image ls -q), $base);
+            my $json = decode_json scalar run_command(qw(docker inspect), @ids);
+            push @all, map { $_->{RepoTags}[0] } @$json;
+        }
+
+        $keep{$image} = 1;
+    }
+
+    my @remove =
+        map { $_->[0] }
+        sort { $a->[1] cmp $b->[1] || $a->[2] cmp $b->[2] || $a->[3] <=> $b->[3] }
+        map { [ $_, split_image($_) ] }
+        grep { !$keep{$_} }
+        @all;
+
+    $params->{images} = [@remove];
+    prompt('CONFIRM_IMAGE_DELETE', $params);
+
+    say (qw(docker rmi), @remove);
 }
 
 sub docker_app_compose {
@@ -686,6 +736,9 @@ Commands:
     start    Start existing containers
     stop     Stop existing containers
     up       Creates and start containers
+    delete   Deletes containers from a specific application version
+    purge    Deletes old containers from the application
+    cache    Prints the cached application version
     version  Prints version information
 
 Command Options:
