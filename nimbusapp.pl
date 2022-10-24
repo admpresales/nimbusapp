@@ -420,10 +420,8 @@ sub purge_images($cmd, $params, $args) {
     for my $image (@images) {
         my ($base, $tag) = split_image $image;
 
-        if (not defined $keep{$base}) {
-            my @ids = run_command(qw(docker image ls -q), $base);
-            my $json = decode_json scalar run_command(qw(docker inspect), @ids);
-            push @all, map { $_->{RepoTags}[0] } @$json;
+        if (not defined $keep{$image}) {
+            push @all, grep { $_ } run_command(qw(docker image ls --format {{.Repository}}:{{.Tag}}), $base)
         }
 
         $keep{$image} = 1;
@@ -431,15 +429,15 @@ sub purge_images($cmd, $params, $args) {
 
     my @remove =
         map { $_->[0] }
-        sort { $a->[1] cmp $b->[1] || $a->[2] cmp $b->[2] || $a->[3] <=> $b->[3] }
+        sort { $a->[1] cmp $b->[1] || versioncmp($a->[2], $b->[2]) }
         map { [ $_, split_image($_) ] }
-        grep { !$keep{$_} }
+        grep { $_ && !$keep{$_} }
         @all;
 
     $params->{images} = [@remove];
     prompt('CONFIRM_IMAGE_DELETE', $params);
 
-    say (qw(docker rmi), @remove);
+    run_command(qw(docker rmi), @remove);
 }
 
 sub docker_app_compose {

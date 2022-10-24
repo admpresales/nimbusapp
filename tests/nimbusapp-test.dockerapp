@@ -9,7 +9,7 @@ version: '3.2'
 services:
   web:
     container_name: '${WEB_CONTAINER}'
-    image: "httpd:2.4"
+    image: "${WEB_IMAGE}"
     ports:
       - "${PORT}:80"
     environment:
@@ -18,4 +18,5 @@ services:
 ---
 WEB_CONTAINER: 'nimbusapp-test-web'
 PORT: 12345
+WEB_IMAGE: httpd:2.4
 MESSAGE: ""
