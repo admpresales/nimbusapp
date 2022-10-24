@@ -1,4 +1,5 @@
 #!/usr/bin/env perl
+use constant START_LINE => __LINE__ - 2;
 
 use 5.020;
 use strict;
@@ -32,6 +33,17 @@ use constant {
     COMPOSE_FILE    => 'docker-compose.yml',
     DEFAULT_TAG_COUNT => 10
 };
+
+# Add handlers for die/warn when distributed via FatPack
+if (START_LINE != 0) {
+    $SIG{__DIE__} = sub {
+        die $_[0] =~ s/line (\d+).$/"$& (Source:" . ($1 - START_LINE) . ')'/re;
+    };
+
+    $SIG{__WARN__} = sub {
+        warn $_[0] =~ s/line (\d+).$/"$& (Source:" . ($1 - START_LINE) . ')'/re;
+    };
+}
 
 my %config = do {
     my $isWin32 = $^O eq 'MSWin32';
