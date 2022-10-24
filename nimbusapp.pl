@@ -561,9 +561,10 @@ if ($config{WINDOWS}) {
 
 my $image_re = qr{
     ^(?<originalImage>
-          (?<org>   [a-z0-9]{4,30}  ) \/ )?             # Optional org  (lowercase + numbers)
-          (?<image> [a-z0-9][a-z0-9_.-]+ )              # Image         (lowercase + numbers + limited special)
-     (?: :(?<tag>   [a-zA-Z0-9][a-zA-Z0-9_.-]+ ) )? $   # Optional tag  (lower/upper + numbers + limited special)
+        (?:   (?<org>   [a-z0-9]{4,30}             ) \/ )?      # Optional org  (lowercase + numbers)
+              (?<image> [a-z0-9][a-z0-9_.-]+       )            # Image         (lowercase + numbers + limited special)
+        (?: : (?<tag>   [a-zA-Z0-9][a-zA-Z0-9_.-]+ )    )?      # Optional tag  (lower/upper + numbers + limited special)
+    )$
 }xx;
 
 my %params = (
