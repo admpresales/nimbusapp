@@ -20,7 +20,7 @@ setup() {
     fi
 
     "$NIMBUS_EXE" "$TEST_IMAGE" -f -d up
-    assert_container_exists "$TEST_CONTAINER"
+    assert_container_running "$TEST_CONTAINER"
 }
 
 teardown() {
