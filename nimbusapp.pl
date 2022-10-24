@@ -541,7 +541,11 @@ sub restart_docker {
 
 # Ensure docker networking is set up
 # { "dns": [ "192.168.61.2" ] }
-if ($config{WINDOWS}) {
+if ($config{WINDOWS} && ! -d dirname $config{DAEMON_CONFIG}) {
+    warning "Could not find Docker configuration directory to check DNS settings.";
+}
+elsif ($config{WINDOWS}) {
+    
     my $daemon = -f $config{DAEMON_CONFIG} ? decode_json( scalar read_file($config{DAEMON_CONFIG}) ) : {};
 
     if (!defined $daemon->{dns} || @{$daemon->{dns}} == 0) {
