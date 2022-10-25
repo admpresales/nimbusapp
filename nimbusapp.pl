@@ -241,6 +241,7 @@ sub prompt_first($label, $sub) {
         my $params = $_[1];
         my $check = '';
         docker_compose('ps', $params, [ '-q' ], \$check);
+        debug("Check result: $check");
 
         if ($check ne '') {
             local $params->{containers} = [];

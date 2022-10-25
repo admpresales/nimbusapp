@@ -13,13 +13,17 @@ function setup() {
     # Create directory and container to be recreated later
     if is_first_test; then
         mkdir -p "$NIMBUS_BASEDIR"
+        log "SETUP"
         cleanup_containers "$TEST_CONTAINER"
-
         run "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=setup" -d -f up
         ((status == 0))
-        assert_container_exists "$TEST_CONTAINER"
+        assert_container_running "$TEST_CONTAINER"
         assert_message "setup"
     fi
+}
+
+function log() {
+    echo "[TEST] $@" >> "$NIMBUS_BASEDIR/nimbusapp.log"
 }
 
 function teardown() {
@@ -48,7 +52,10 @@ function assert_message() {
 }
 
 @test "Recreate: Yes" {
+    log "RECREATE: YES"
     run "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=yes" -d up <<< $'y\n'
+
+    log "Output:" $output
 
     (( status == 0 ))
 
@@ -62,6 +69,7 @@ function assert_message() {
 }
 
 @test "Recreate: No" {
+    log "RECREATE: NO"
     run "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=no" -d up <<< $'n\n'
 
     (( status == 0 ))
@@ -77,6 +85,7 @@ function assert_message() {
 }
 
 @test "Recreate: Force" {
+    log "RECREATE: FORCE"
     run "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=force" -d -f up
 
     (( stauts == 0 ))
