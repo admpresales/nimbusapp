@@ -53,6 +53,7 @@ function assert_message() {
 
 @test "Recreate: Yes" {
     log "RECREATE: YES"
+    docker ps -a >> "$NIMBUS_BASEDIR/nimbusapp.log"
     run "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=yes" -d up <<< $'y\n'
 
     log "Output:" $output
