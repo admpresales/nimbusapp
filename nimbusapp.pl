@@ -17,6 +17,7 @@ use YAML::Tiny;     # Docker compose
 use HTTP::Tiny;     # Download update, tags
 use Template::Tiny; # Text content
 
+use Scalar::Util qw(reftype);
 use Getopt::Long;
 use Time::Piece;
 use Sort::Versions;
@@ -110,7 +111,6 @@ $dispatch{$_} = \&docker_compose for qw( pull start stop restart rm ps logs exec
 use subs qw(info debug warning error fatal usage);
 
 sub _log {
-    return if $ENV{NIMBUS_INTERNAL};
     my $logLevel = shift;
     my $t = localtime;
     open(my $fh, '>>', $config{LOG_FILE});
@@ -118,14 +118,14 @@ sub _log {
     close($fh);
 }
 
-sub _output { print STDERR @_, $config{NL} unless $ENV{NIMBUS_INTERNAL}; }
+sub _output { print STDERR @_, $config{NL}; }
 
 sub debug   { _log 'DEBUG', @_; _output @_ if $config{DEBUG}; }
 sub info    { _log  'INFO', @_; _output @_ unless $config{QUIET}; }
 sub warning { _log  'WARN', @_; _output text_block('LABEL_WARN'), @_; }
 sub error   { _log 'ERROR', @_; _output text_block('LABEL_ERROR'), @_; }
-sub fatal   { _log 'FATAL', @_; _output text_block('LABEL_ERROR'), @_; exit 1; }
-sub usage   { _log 'FATAL', @_; _output @_ ? (text_block('LABEL_ERROR'), @_, $config{NL}) : '', text_block('USAGE'); exit 1; }
+sub fatal   { _log 'FATAL', @_; die text_block('LABEL_ERROR'), @_, $config{NL}; }
+sub usage   { fatal @_ ? (text_block('LABEL_ERROR'), @_, $config{NL}) : '', text_block('USAGE'); }
 
 # Load some text from the configuration document at the bottom of this file
 # This keeps huge blocks of text out of the code, which may or may not be useful
@@ -151,18 +151,32 @@ sub text_block($name, $params = {}) {
     return $output;
 }
 
-sub run_command(@cmd) {
-    @cmd = quote_system(@cmd) if $config{WINDOWS};
-    debug("Running: @cmd");
-    open(my $fh, '-|', @cmd) or die "Could not run $cmd[0]: $!\n";
-    if (wantarray) {
-        chomp(my @out = <$fh>);
-        return @out;
+sub run_command($cmd, $output = undef) {
+    $cmd = [ quote_system(@$cmd) ] if $config{WINDOWS};
+    debug("Running: @$cmd");
+    open(my $fh, '-|', @$cmd) or fatal "Could not run $cmd->[0]: $! ($?)";
+    $fh->autoflush;
+
+    my $mode = reftype $output || 0;
+
+    while (defined(my $line = <$fh>)) {
+        if ($mode eq 'ARRAY') {
+            chomp $line;
+            push @$output, $line;
+        }
+        elsif ($mode eq 'SCALAR') {
+            $$output .= $line;
+        }
+        elsif ($mode eq 'GLOB') {
+            print $output $line;
+        }
+        else {
+            print $line;
+        }
     }
-    else {
-        local $/;
-        return <$fh>;
-    }
+
+    close($fh) or fatal "Error running $cmd->[0]: $! ($?)";
+    return $?;
 }
 
 sub download($url, $context = 'Download error') {
@@ -198,19 +212,15 @@ sub update_version {
     my $nimbus_exe = catfile($config{INSTALL}, 'nimbusapp');
 
     my @extract = $config{WINDOWS}
-            ?  quote_system('powershell', '-c', qq(Expand-Archive -Force -Path "$archive" -DestinationPath "$config{INSTALL}"))
+            ? ( 'powershell', '-c', qq(Expand-Archive -Force -Path "$archive" -DestinationPath "$config{INSTALL}") )
             : ( (! -w $nimbus_exe || ! -w $config{INSTALL} ? 'sudo' : ()), 'tar', 'xzf', $archive, '--no-same-owner', '-C', $config{INSTALL} );
 
-    debug("Running: @extract");
-    system(@extract);
+    run_command([ @extract ]);
 
     fatal "Failed to extract '$archive'. Status: $?" if $?;
 
     unlink($archive) if -f $archive;
-
-    my @version = ($nimbus_exe, '--version');
-    debug("Running: @version");
-    system(@version);
+    run_command([ $nimbus_exe, '--version' ]);
 }
 
 sub prompt($label, $params = {}) {
@@ -229,30 +239,17 @@ sub prompt($label, $params = {}) {
 sub prompt_first($label, $sub) {
     return sub {
         my $params = $_[1];
+        my $check = '';
+        docker_compose('ps', $params, [ '-q' ], \$check);
 
-        if (nimbusapp($params, 'ps -q')) {
-            local $params->{containers} = [ nimbusapp($params, 'ps --service --all') ];
+        if ($check ne '') {
+            local $params->{containers} = [];
+            docker_compose('ps', $params, [ qw(--service --all) ], $params->{containers});
             prompt($label, $params);
         }
 
         $sub->(@_);        
     };
-}
-
-sub nimbusapp($params, @args) {
-    my @result = do {
-        local $ENV{NIMBUS_INTERNAL} = 1; # Prevent recursive logging
-        my $a = join ' ', @args;
-        qx{perl "$0" "$params->{originalImage}" -q $a}
-    };
-
-    if (wantarray) {
-        chomp @result;
-        return @result;
-    }
-    else {
-        return join '', @result;
-    }
 }
 
 sub apply_mounts($params) {
@@ -287,9 +284,7 @@ sub apply_mounts($params) {
 
 sub docker_app($cmd, $params, $args) {
     if ($cmd eq 'inspect') {
-        my @command = ('docker-app', 'inspect', $params->{fullImage});
-        debug("Running: ", join ' ', @command);
-        system(@command) or exit $?;
+        run_command([ 'docker-app', 'inspect', $params->{fullImage} ]);
     }
     else { # Render
         my @settings = map { 
@@ -300,25 +295,20 @@ sub docker_app($cmd, $params, $args) {
 
         my $temp = File::Temp->new(UNLINK => 0);
 
-        my @command = ('docker-app', 'render', @settings, $params->{fullImage});
-        @command = quote_system(@command) if $config{WINDOWS};
-        debug("Running: ", join ' ', @command);
-        open(my $app, '-|', @command) or fatal "Could not run docker-app: $! ($?)";
+        eval {
+            local $SIG{__DIE__};
+            run_command([ 'docker-app', 'render', @settings, $params->{fullImage} ], $temp);
+        };
 
-        while (defined(my $line = <$app>)) {
-            print $temp $line;
-        }
-
-        close($app);     my $rc = $? >> 8;
         close($temp);
 
-        if ($rc) {
+        if ($@) {
             unlink($temp->filename);
             if ($params->{tag} =~ /^(.*?)_/) {
                 warning "Image name contains an underscore which is not used by nimbusapp. ",
                       sprintf "Try using %s/%s:%s instead.", $params->{org}, $params->{image}, $1;
             }
-            fatal "Could not render."
+            fatal "Could not render. $@";
         }
 
         move $temp->filename, $params->{composeFile} or fatal "Error moving compose file: $!";
@@ -332,7 +322,7 @@ sub docker_app($cmd, $params, $args) {
     return 0;
 }
 
-sub docker_compose($cmd, $params, $args) {
+sub docker_compose($cmd, $params, $args, $output = undef) {
     if (! -f $params->{composeFile}) {
         my $oldComposeFile = catfile($config{CACHE}, $params->@{qw(project org image tag)}, $params->{image} . '.yml');
 
@@ -370,12 +360,7 @@ sub docker_compose($cmd, $params, $args) {
         unshift @$args, '--remove-orphans' unless grep { $_ eq '--remove-orphans' } @$args;
     }
 
-    my @compose = ( 'docker-compose', '-f', $params->{composeFile}, '-p', $params->{project}, $cmd, @$args );
-    @compose = quote_system(@compose) if $config{WINDOWS};
-    debug("Running: ", join ' ', @compose);
-    system @compose;
-
-    return 0;
+    return run_command([ 'docker-compose', '-f', $params->{composeFile}, '-p', $params->{project}, $cmd, @$args ], $output);
 }
 
 sub delete_image($cmd, $params, $args) {
@@ -399,13 +384,7 @@ sub delete_image($cmd, $params, $args) {
     local $params->{images} = [ @images ];
     prompt('CONFIRM_IMAGE_DELETE', $params);
 
-    my @command = ('docker', 'rmi', @images);
-    @command = quote_system(@command) if $config{WINDOWS};
-    
-    debug("Running: ", join(@command));
-    system(@command);
-    
-    return $?;
+    return run_command(['docker', 'rmi', @images])
 }
 
 sub purge_images($cmd, $params, $args) {
@@ -419,25 +398,21 @@ sub purge_images($cmd, $params, $args) {
 
     for my $image (@images) {
         my ($base, $tag) = split_image $image;
-
-        if (not defined $keep{$image}) {
-            push @all, grep { $_ } run_command(qw(docker image ls --format {{.Repository}}:{{.Tag}}), $base)
-        }
-
         $keep{$image} = 1;
+        run_command([ qw(docker image ls --format {{.Repository}}:{{.Tag}}), $base ], \@all);
     }
 
     my @remove =
         map { $_->[0] }
         sort { $a->[1] cmp $b->[1] || versioncmp($a->[2], $b->[2]) }
         map { [ $_, split_image($_) ] }
-        grep { $_ && !$keep{$_} }
+        grep { state $seen = {}; $_ && !$keep{$_} && !$seen->{$_}++ }
         @all;
 
     $params->{images} = [@remove];
     prompt('CONFIRM_IMAGE_DELETE', $params);
 
-    run_command(qw(docker rmi), @remove);
+    run_command([ qw(docker rmi), @remove ]);
 }
 
 sub docker_app_compose {
