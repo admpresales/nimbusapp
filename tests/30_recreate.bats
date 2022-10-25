@@ -11,12 +11,16 @@ function setup() {
     export NIMBUS_BASEDIR="$BATS_TMPDIR/nimbus-test-recreate"
 
     # Create directory and container to be recreated later
-    if is_first_test; then
-        mkdir -p "$NIMBUS_BASEDIR"
+    mkdir -p "$NIMBUS_BASEDIR"
+    log "SETUP"
+    log "TEST NAME: $BATS_TEST_NAME"
+    log "TEST ZERO: {$BATS_TEST_NAMES[0]}"
+    
+    if [[ -z "$SETUP_INITIAL" ]]; then
+        export SETUP_INITIAL=1
         log "SETUP"
         cleanup_containers "$TEST_CONTAINER"
-        run "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=setup" -d -f up
-        ((status == 0))
+        "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=setup" -d -f up
         assert_container_running "$TEST_CONTAINER"
         assert_message "setup"
     fi
