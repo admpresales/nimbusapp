@@ -12,18 +12,6 @@ function setup() {
 
     # Create directory and container to be recreated later
     mkdir -p "$NIMBUS_BASEDIR"
-    log "SETUP"
-    log "TEST NAME: $BATS_TEST_NAME"
-    log "TEST ZERO: {$BATS_TEST_NAMES[0]}"
-    
-    if [[ -z "$SETUP_INITIAL" ]]; then
-        export SETUP_INITIAL=1
-        log "SETUP"
-        cleanup_containers "$TEST_CONTAINER"
-        "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=setup" -d -f up
-        assert_container_running "$TEST_CONTAINER"
-        assert_message "setup"
-    fi
 }
 
 function log() {
@@ -57,6 +45,11 @@ function assert_message() {
 
 @test "Recreate: Yes" {
     log "RECREATE: YES"
+
+    "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=initial" -d -f up
+    assert_container_running "$TEST_CONTAINER"
+    assert_message "initial"
+
     docker ps -a >> "$NIMBUS_BASEDIR/nimbusapp.log"
     run "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=yes" -d up <<< $'y\n'
 
