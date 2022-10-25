@@ -16,6 +16,9 @@ use IO::Compress::Zip qw(zip $ZipError);
 remove_tree('build', { error => \my $error });
 die join "\n", map { join " => ", %$_ } @$error if @$error;
 
+system(qw(perl -c nimbusapp.pl));
+die "Compile failed with code $?. Please check above for compile errors.\n" if $?;
+
 make_path('build');
 
 # Pre-process nimbusapp.pl
