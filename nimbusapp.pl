@@ -324,18 +324,16 @@ sub docker_app($cmd, $params, $args) {
 
 sub docker_compose($cmd, $params, $args, $output = undef) {
     if (! -f $params->{composeFile}) {
+        make_path($params->{composeDir}) unless -d $params->{composeDir};
+
         my $oldComposeFile = catfile($config{CACHE}, $params->@{qw(project org image tag)}, $params->{image} . '.yml');
 
-        if (-f $oldComposeFile 
-            && move($oldComposeFile, $params->{composeFile})) {
-            
+        if (-f $oldComposeFile) {
             info "Importing configuration from previous version of nimbusapp";
+            move($oldComposeFile, $params->{composeFile}) or warning "Could not import old config: $!";
         }
-        else {
-            if ($!) {
-                warning "Error importing old config: $!";
-            }
 
+        if (! -f $params->{composeFile}) {
             my $rc = docker_app($cmd, $params, $args);
             return $rc if $rc;
         }
