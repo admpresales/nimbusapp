@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 load helper
+load output_assert
 load docker_assert
 
 @test "Delete" {
@@ -16,6 +17,11 @@ load docker_assert
     assert_image_exists "${image}:0.1.0"
     assert_image_exists "${image}:0.3.0"
     assert_not_image_exists "${image}:0.2.0"
+
+    run "$NIMBUS_EXE" -s WEB_IMAGE="${image}:0.2.0" "${TEST_IMAGE}" -f delete
+
+    (( status == 0 ))
+    assert_output_contains "Nothing to delete."
 
     docker rmi "${image}:0.1.0" "${image}:0.3.0"
 }
@@ -35,6 +41,10 @@ load docker_assert
 
     assert_not_image_exists "${image}:0.1.0"
     assert_not_image_exists "${image}:0.3.0"
+
+    run "$NIMBUS_EXE" "${TEST_IMAGE}" -f purge
+    (( status == 0 ))
+    assert_output_contains "Nothing to delete."
 
     docker rmi "${image}:0.2.0"
 }

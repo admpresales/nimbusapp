@@ -376,7 +376,7 @@ sub delete_image($cmd, $params, $args) {
         values $compose->[0]{services}->%*;
 
     unless (@images) {
-        info "No images found.";
+        info "Nothing to delete.";
         return 0;
     }
 
@@ -407,6 +407,11 @@ sub purge_images($cmd, $params, $args) {
         map { [ $_, split_image($_) ] }
         grep { state $seen = {}; $_ && !$keep{$_} && !$seen->{$_}++ }
         @all;
+
+    unless (@remove) {
+        info "Nothing to delete.";
+        return 0;
+    }
 
     $params->{images} = [@remove];
     prompt('CONFIRM_IMAGE_DELETE', $params);
