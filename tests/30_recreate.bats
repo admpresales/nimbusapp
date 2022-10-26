@@ -7,21 +7,20 @@ load helper
 load output_assert
 load docker_assert
 
-function setup() {
+function setup_file() {
     export NIMBUS_BASEDIR="$BATS_TMPDIR/nimbus-test-recreate"
 
-    # Create directory and container to be recreated later
     mkdir -p "$NIMBUS_BASEDIR"
+
+    "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=initial" -d -f up
+    assert_container_running "$TEST_CONTAINER"
+    assert_message "initial"
 }
 
-function log() {
-    echo "[TEST] $@" >> "$NIMBUS_BASEDIR/nimbusapp.log"
-}
-
-function teardown() {
+function teardown_file() {
     if is_last_test; then
         cleanup_containers "$TEST_CONTAINER"
-        # rm -fr "$NIMBUS_BASEDIR"
+        rm -fr "$NIMBUS_BASEDIR"
     fi
 }
 
@@ -44,16 +43,9 @@ function assert_message() {
 }
 
 @test "Recreate: Yes" {
-    log "RECREATE: YES"
 
-    "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=initial" -d -f up
-    assert_container_running "$TEST_CONTAINER"
-    assert_message "initial"
 
-    docker ps -a >> "$NIMBUS_BASEDIR/nimbusapp.log"
     run "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=yes" -d up <<< $'y\n'
-
-    log "Output:" $output
 
     (( status == 0 ))
 
@@ -67,7 +59,6 @@ function assert_message() {
 }
 
 @test "Recreate: No" {
-    log "RECREATE: NO"
     run "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=no" -d up <<< $'n\n'
 
     (( status == 0 ))
@@ -83,7 +74,6 @@ function assert_message() {
 }
 
 @test "Recreate: Force" {
-    log "RECREATE: FORCE"
     run "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=force" -d -f up
 
     (( stauts == 0 ))
