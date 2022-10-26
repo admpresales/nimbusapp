@@ -7,22 +7,17 @@ load helper
 load output_assert
 load docker_assert
 
-function setup() {
+function setup_file() {
     export NIMBUS_BASEDIR="$BATS_TMPDIR/nimbus-test-recreate"
 
-    # Create directory and container to be recreated later
-    if is_first_test; then
-        mkdir -p "$NIMBUS_BASEDIR"
-        cleanup_containers "$TEST_CONTAINER"
+    mkdir -p "$NIMBUS_BASEDIR"
 
-        run "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=setup" -d -f up
-        ((status == 0))
-        assert_container_exists "$TEST_CONTAINER"
-        assert_message "setup"
-    fi
+    "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=initial" -d -f up
+    assert_container_running "$TEST_CONTAINER"
+    assert_message "initial"
 }
 
-function teardown() {
+function teardown_file() {
     if is_last_test; then
         cleanup_containers "$TEST_CONTAINER"
         rm -fr "$NIMBUS_BASEDIR"
@@ -48,6 +43,8 @@ function assert_message() {
 }
 
 @test "Recreate: Yes" {
+
+
     run "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=yes" -d up <<< $'y\n'
 
     (( status == 0 ))

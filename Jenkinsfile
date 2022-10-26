@@ -84,6 +84,7 @@ pipeline {
                 sh '''
                 (
                     set -xe
+                    bats -v
                     perl -V
                     docker version
                     docker-compose version
