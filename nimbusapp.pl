@@ -626,8 +626,10 @@ elsif (!defined($params{tag}) && $command ne 'tags') {
     }
 }
 
+if ($command ne 'tags') {
     $params{fullImage} = sprintf "%s/%s.dockerapp:%s", @params{qw(org image tag)};
-info 'Using: ', $params{fullImage} unless $command eq 'tags' || $command eq 'render';
+    info 'Using: ', $params{fullImage} unless $command eq 'tags' || $command eq 'render';
+}
 
 my $rc = $dispatch{$command}->($command, \%params, \@ARGV);
 save_app_config(%params) if $config{SAVE_APPS_CONFIG} && $rc == 0;
