@@ -32,7 +32,8 @@ use constant {
     RELEASE_VERSION => "CHANGEME_RELEASE",
     RELEASE_DATE    => "CHANGEME_DATE",
     COMPOSE_FILE    => 'docker-compose.yml',
-    DEFAULT_TAG_COUNT => 10
+    DEFAULT_TAG_COUNT => 10,
+    STDOUT_FLAG => '__OUTPUT_TO_STDOUT__'
 };
 
 # Add handlers for die/warn when distributed via FatPack
@@ -154,6 +155,13 @@ sub text_block($name, $params = {}) {
 sub run_command($cmd, $output = undef) {
     $cmd = [ quote_system(@$cmd) ] if $config{WINDOWS};
     debug("Running: @$cmd");
+
+    # Special case, for docker-compose up|pull to properly display progress text
+    if (defined $output && $output eq STDOUT_FLAG) {
+        system(@$cmd) or fatal "system: Could not run $cmd->[0]: $! ($?)";
+        return $?;
+    }
+
     open(my $fh, '-|', @$cmd) or fatal "Could not run $cmd->[0]: $! ($?)";
     $fh->autoflush;
 
@@ -359,6 +367,7 @@ sub docker_compose($cmd, $params, $args, $output = undef) {
         unshift @$args, '--remove-orphans' unless grep { $_ eq '--remove-orphans' } @$args;
     }
 
+    $output = STDOUT_FLAG if not defined $output and not $config{DEBUG} and ($cmd eq 'up' or $cmd eq 'pull');
     return run_command([ 'docker-compose', '-f', $params->{composeFile}, '-p', $params->{project}, $cmd, @$args ], $output);
 }
 
