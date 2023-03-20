@@ -64,7 +64,8 @@ my %config = do {
         APPS_CONFIG => $ENV{NIMBUS_CONFIG} // catfile($nimbusHome, 'apps.json'),
         APPS_OLD_CONFIG => $ENV{NIMBUS_OLD_CONFIG} // catfile($nimbusHome, 'apps.config'),
         CACHE => $ENV{NIMBUS_CACHE} // catfile($nimbusHome, 'cache'),
-        DEBUG => $ENV{NIMBUS_DEBUG} // 0,     # Be verbose
+        DEBUG => $ENV{NIMBUS_DEBUG} // $ENV{NIMBUS_TRACE} // 0,     # Be verbose
+        TRACE => $ENV{NIMBUS_TRACE} // 0,     # Be too verbose
         FORCE => $ENV{NIMBUS_FORCE} // 0,     # Skip prompts
         QUIET => $ENV{NIMBUS_QUIET} // 0,     # Be quiet
         DAEMON_CONFIG => $isWin32 ? 'C:\ProgramData\Docker\config\daemon.json' : '/etc/docker/daemon.json',
@@ -121,6 +122,7 @@ sub _log {
 
 sub _output { print STDERR @_, $config{NL}; }
 
+sub trace   { return unless $config{TRACE}; _log 'TRACE', @_; _output @_; }
 sub debug   { _log 'DEBUG', @_; _output @_ if $config{DEBUG}; }
 sub info    { _log  'INFO', @_; _output @_ unless $config{QUIET}; }
 sub warning { _log  'WARN', @_; _output text_block('LABEL_WARN'), @_; }
@@ -158,16 +160,19 @@ sub run_command($cmd, $output = undef) {
 
     # Special case, for docker-compose up|pull to properly display progress text
     if (defined $output && $output eq STDOUT_FLAG) {
+        trace("Using system() to execute", @$cmd);
         system(@$cmd) or fatal "system: Could not run $cmd->[0]: $! ($?)";
         return $?;
     }
 
+    trace("Using open() to execute", @$cmd);
     open(my $fh, '-|', @$cmd) or fatal "Could not run $cmd->[0]: $! ($?)";
     $fh->autoflush;
 
     my $mode = reftype $output || 0;
 
     while (defined(my $line = <$fh>)) {
+        _log 'OUT', $line if $config{DEBUG};
         if ($mode eq 'ARRAY') {
             chomp $line;
             push @$output, $line;
