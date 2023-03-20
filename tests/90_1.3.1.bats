@@ -31,7 +31,7 @@ function teardown() {
     
     cat "$logFile"
 
-    grep "CMD $TEST_IMAGE -s MESSAGE=$num -f up" "$logFile"
+    grep "CMD $TEST_IMAGE -s MESSAGE=$num -d -f up" "$logFile"
     
     # grep "DEBUG - -s MESSAGE=$num" "$logFile"
 

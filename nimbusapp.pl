@@ -172,7 +172,11 @@ sub run_command($cmd, $output = undef) {
     my $mode = reftype $output || 0;
 
     while (defined(my $line = <$fh>)) {
-        _log 'OUT', $line if $config{DEBUG};
+        if ($config{DEBUG}) {
+            chomp(my $ln = $line);
+            _log 'OUT', $ln;
+        }
+        
         if ($mode eq 'ARRAY') {
             chomp $line;
             push @$output, $line;
