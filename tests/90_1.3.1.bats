@@ -25,7 +25,7 @@ function teardown() {
     local logFile="$NIMBUS_BASEDIR/nimbusapp.log"
     local num="$RANDOM"
 
-    run "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=$num" -f up
+    run "$NIMBUS_EXE" "$TEST_IMAGE" -s "MESSAGE=$num" -d -f up
 
     (( status == 0 ))
     
