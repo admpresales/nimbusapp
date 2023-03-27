@@ -159,9 +159,9 @@ sub run_command($cmd, $output = undef) {
     debug("Running: @$cmd");
 
     # Special case, for docker-compose up|pull to properly display progress text
-    if (defined $output && $output eq STDOUT_FLAG) {
+    if (!$config{debug} && defined $output && $output eq STDOUT_FLAG) {
         trace("Using system() to execute", @$cmd);
-        system(@$cmd) or fatal "system: Could not run $cmd->[0]: $! ($?)";
+        system(@$cmd) == 0 or fatal "system: Could not run $cmd->[0]: $! ($?)";
         return $?;
     }
 
@@ -376,7 +376,7 @@ sub docker_compose($cmd, $params, $args, $output = undef) {
         unshift @$args, '--remove-orphans' unless grep { $_ eq '--remove-orphans' } @$args;
     }
 
-    $output = STDOUT_FLAG if not defined $output and not $config{DEBUG} and ($cmd eq 'up' or $cmd eq 'pull');
+    $output = STDOUT_FLAG if not defined $output and ($cmd eq 'up' or $cmd eq 'pull');
     return run_command([ 'docker-compose', '-f', $params->{composeFile}, '-p', $params->{project}, $cmd, @$args ], $output);
 }
 
