@@ -71,7 +71,7 @@ pipeline {
                 sh """
                 set -xe
                 docker build . -t nimbusapp-builder:${env.BRANCH_NAME}
-                docker run --rm -v "\$PWD:/app" -w /app nimbusapp-builder:${env.BRANCH_NAME} perl build.pl ${env.BRANCH_NAME}
+                docker run --rm -v "\$PWD:/app" --user 1000:1000 -w /app nimbusapp-builder:${env.BRANCH_NAME} perl build.pl ${env.BRANCH_NAME}
                 """
             }
         }
