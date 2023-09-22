@@ -77,6 +77,7 @@ my %config = do {
         INTELLIJ_MOUNT_M2   => $ENV{NIMBUS_INTELLIJ_MAVEN} // catfile( $userHome, '.m2' ),
         NL => $isWin32 ? "\r\n" : "\n",
         SAVE_APPS_CONFIG => $ENV{NIMBUS_SAVE_CONFIG} // 1,
+        COMPOSE_COMMAND => $ENV{NIMBUS_COMPOSE} ? [ split ' ', $ENV{NIMBUS_COMPOSE} ] : [ 'docker-compose' ]
     );
 };
 
@@ -262,7 +263,7 @@ sub prompt_first($label, $sub) {
 
         if ($check ne '') {
             local $params->{containers} = [];
-            docker_compose('ps', $params, [ qw(--service --all) ], $params->{containers});
+            docker_compose('ps', $params, [ qw(--services --all) ], $params->{containers});
             prompt($label, $params);
         }
 
@@ -377,7 +378,7 @@ sub docker_compose($cmd, $params, $args, $output = undef) {
     }
 
     $output = STDOUT_FLAG if not defined $output and ($cmd eq 'up' or $cmd eq 'pull');
-    return run_command([ 'docker-compose', '-f', $params->{composeFile}, '-p', $params->{project}, $cmd, @$args ], $output);
+    return run_command([ $config{COMPOSE_COMMAND}->@*, '-f', $params->{composeFile}, '-p', $params->{project}, $cmd, @$args ], $output);
 }
 
 sub delete_image($cmd, $params, $args) {
@@ -453,7 +454,7 @@ sub list_tags($, $params, $) {
         grep { $n-- > 0 }
         sort { versioncmp($b, $a) }
         map { $_->{name} }
-        grep { $_->{name} !~ /-dev$/ } @$data;
+        grep { $params->{all} or $_->{name} !~ /-dev$/ } @$data;
 }
 
 sub read_app_config_json {
@@ -585,7 +586,7 @@ my $command;
     GetOptions( \%params, 
         'project|p=s',
         'intellij_home|v', 'intellij_m2|m', 'preserve_volumes',
-        'debug|d', 'quiet|q', 'force|f',
+        'debug|d', 'quiet|q', 'force|f', 'all|a',
         'number|n=i', 'latest',
         'set|s=s%',
         ( map { $_ => \&dispatch_exit } qw(help update version) ),
