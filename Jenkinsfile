@@ -3,6 +3,12 @@
 pipeline {
     agent { label 'linux' }
 
+    environment {
+        PERLBREW_ROOT = '/opt/perl5'
+        PERLBREW = "$PERLBREW_ROOT/bin/perlbrew"
+        PERL_VERSION = "5.20.3"
+    }
+
     parameters {
         booleanParam(
                 name: 'DOCKERAPP_FORCE_PUSH',
@@ -84,8 +90,8 @@ pipeline {
                 sh '''
                 (
                     set -xe
-                    bats -v
-                    perl -V
+                    $PWD/bats-core/bin/bats -v
+                    $PERLBREW exec --with $PERL_VERSION perl -V
                     docker version
                     docker-compose version
                     docker-app version
@@ -103,9 +109,8 @@ pipeline {
 
                         export PATH="$PWD/bats-core/bin:$PWD/bats-core/libexec/bats-core:$PATH"
                         export NIMBUS_EXE="./build/nimbusapp.packed.pl"
-                        export PERLBREW_ROOT=/opt/perl5
 
-                        /opt/perl5/bin/perlbrew exec --with 5.20.3 bats tests --tap | tee bats-tap.log
+                        $PERLBREW exec --with "$PERL_VERSION" bats tests --tap | tee bats-tap.log
                     '''
                 }
             }
