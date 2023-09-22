@@ -378,7 +378,7 @@ sub docker_compose($cmd, $params, $args, $output = undef) {
     }
 
     $output = STDOUT_FLAG if not defined $output and ($cmd eq 'up' or $cmd eq 'pull');
-    return run_command([ $config->{COMPOSE_COMMAND}->@*, '-f', $params->{composeFile}, '-p', $params->{project}, $cmd, @$args ], $output);
+    return run_command([ $config{COMPOSE_COMMAND}->@*, '-f', $params->{composeFile}, '-p', $params->{project}, $cmd, @$args ], $output);
 }
 
 sub delete_image($cmd, $params, $args) {
